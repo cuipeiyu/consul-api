@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -268,6 +269,18 @@ func structSkip(name string) bool {
 	default:
 		return true
 	case
+		"HealthCheck",
+		"HealthCheckDefinition",
+		"CheckDefinition",
+		"RaftIndex",
+		"NodeService",
+		"EnterpriseMeta",
+		"ServiceKind",
+		"ServiceAddress",
+		"Weights",
+		"Locality",
+		"ConnectProxyConfig",
+		"ServiceConnect",
 		"WriteRequest",
 		"QueryOptions":
 		return false
@@ -320,7 +333,7 @@ func toRustType(name string) string {
 		return "Duration"
 	case "time.Time":
 		return "DateTime"
-	case "string":
+	case "string", "CheckID", "ServiceKind":
 		return "String"
 	case "int":
 		return "isize"
@@ -413,29 +426,15 @@ func getGoEnv(key string) string {
 	return string(out)
 }
 
-func toSnake(camel string) (snake string) {
-	var b strings.Builder
-	diff := 'a' - 'A'
-	l := len(camel)
-	for i, v := range camel {
-		// A is 65, a is 97
-		if v >= 'a' {
-			b.WriteRune(v)
-			continue
-		}
-		// v is capital letter here
-		// irregard first letter
-		// add underscore if last letter is capital letter
-		// add underscore when previous letter is lowercase
-		// add underscore when next letter is lowercase
-		if (i != 0 || i == l-1) && (          // head and tail
-		(i > 0 && rune(camel[i-1]) >= 'a') || // pre
-			(i < l-1 && rune(camel[i+1]) >= 'a')) { //next
-			b.WriteRune('_')
-		}
-		b.WriteRune(v + diff)
-	}
-	return b.String()
+var matchNonAlphaNumeric = regexp.MustCompile(`[^a-zA-Z0-9]+`)
+var matchFirstCap = regexp.MustCompile("(.)([A-Z][a-z]+)")
+var matchAllCap = regexp.MustCompile("([a-z0-9])([A-Z])")
+
+func toSnake(camel string) string {
+	camel = matchNonAlphaNumeric.ReplaceAllString(camel, "_")   //非常规字符转化为 _
+	snake := matchFirstCap.ReplaceAllString(camel, "${1}_${2}") //拆分出连续大写
+	snake = matchAllCap.ReplaceAllString(snake, "${1}_${2}")    //拆分单词
+	return strings.ToLower(snake)                               //全部转小写
 }
 
 // here is the test

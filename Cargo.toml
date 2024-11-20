@@ -1,0 +1,28 @@
+[package]
+name = "consul-api"
+version = "0.0.0"
+edition = "2021"
+authors = ["PeiYu Cui <i@cuipeiyu.com>"]
+license = "MIT OR Apache-2.0"
+include = ["Cargo.toml", "src", "README.md", "LICENSE-*", "benches"]
+exclude = ["*.png"]
+description = ""
+homepage = ""
+repository = ""
+documentation = "https://docs.rs/consul_api"
+categories = []
+keywords = []
+readme = "README.md"
+
+[features]
+default = ["v1-20-x"]
+http-api = []
+rpc-api = []
+v1-20-x = ["api-v1"]
+api-v1 = []
+enterprise = []
+
+[dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

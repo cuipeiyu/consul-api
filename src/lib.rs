@@ -1,9 +1,9 @@
-#![warn(missing_docs)]
+//#![warn(missing_docs)]
 
 use anyhow::{anyhow, Result};
 use reqwest::{
     header::{HeaderMap, HeaderValue, AUTHORIZATION},
-    Client, ClientBuilder, Method,
+    Method,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::collections::HashMap;
@@ -19,23 +19,29 @@ pub struct Config {
     pub address: String,
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Config {
+impl Config {
+    pub fn from_env() -> Self {
+        Self {
             token: read_env_or_default("CONSUL_TOKEN", ""),
             address: read_env_or_default("CONSUL_ADDRESS", "http://127.0.0.1:8500"),
         }
     }
 }
 
-pub struct AgentBuilder {
+impl Default for Config {
+    fn default() -> Self {
+        Self::from_env()
+    }
+}
+
+pub struct ClientBuilder {
     cfg: Config,
     proxies: Vec<Proxy>,
 }
 
-impl AgentBuilder {
-    pub fn new(cfg: Config) -> AgentBuilder {
-        AgentBuilder {
+impl ClientBuilder {
+    pub fn new(cfg: Config) -> Self {
+        Self {
             cfg,
             proxies: vec![],
         }
@@ -46,7 +52,7 @@ impl AgentBuilder {
         self
     }
 
-    pub fn build(self) -> Result<AgentClient> {
+    pub fn build(self) -> Result<Client> {
         let mut headers = HeaderMap::new();
         if !self.cfg.token.is_empty() {
             headers.insert(
@@ -55,7 +61,7 @@ impl AgentBuilder {
             );
         }
 
-        let mut builder = ClientBuilder::new();
+        let mut builder = reqwest::ClientBuilder::new();
         builder = builder.default_headers(headers);
 
         for proxy in self.proxies {
@@ -63,9 +69,9 @@ impl AgentBuilder {
             builder = builder.proxy(proxy)
         }
 
-        Ok(AgentClient {
+        Ok(Client {
             cfg: self.cfg,
-            requester: builder.build()?,
+            http: builder.build()?,
             #[cfg(feature = "v1")]
             prefix: "/v1".to_string(),
         })
@@ -158,7 +164,8 @@ pub struct RegisterServiceRequestQuery {
     /// Using this parameter allows to idempotently register a service and
     /// its checks without having to manually deregister checks.
     #[serde(rename = "replace-existing-checks")]
-    pub replace_existing_checks: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub replace_existing_checks: Option<String>,
 
     #[cfg(feature = "enterprise")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -218,15 +225,136 @@ pub struct ConnectAuthorizeRequestReply {
     pub reason: String,
 }
 
-pub struct AgentClient {
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct KVReadKeyRequestQuery {
+    /// Specifies the path of the key to read.
+    #[serde(skip_serializing)]
+    pub key: String,
+
+    /// Specifies the datacenter to query. This will default to the
+    /// datacenter of the agent being queried.
+    pub dc: Option<String>,
+
+    /// Specifies if the lookup should be recursive and treat key as a
+    /// prefix instead of a literal match.
+    pub recurse: Option<bool>,
+
+    /// Specifies the response is just the raw value of the key, without
+    /// any encoding or metadata.
+    pub raw: Option<bool>,
+
+    /// Specifies to return only keys (no values or metadata). Specifying
+    /// this parameter implies recurse.
+    pub keys: Option<bool>,
+
+    /// Specifies the string to use as a separator for recursive key
+    /// lookups. This option is only used when paired with the keys
+    /// parameter to limit the prefix of keys returned, only up to the
+    /// given separator.
+    pub separator: Option<String>,
+
+    #[cfg(feature = "enterprise")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ns: Option<String>,
+
+    /// The admin partition to use. If not provided, the partition is
+    /// inferred from the request's ACL token, or defaults to the default
+    /// partition.
+    #[cfg(feature = "enterprise")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partition: Option<String>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct KVCreateOrUpdateKeyRequestQuery {
+    /// Specifies the path of the key to create or update.
+    #[serde(skip_serializing)]
+    pub key: String,
+
+    /// Specifies the datacenter to query. This will default to the
+    /// datacenter of the agent being queried.
+    pub dc: Option<String>,
+
+    /// Specifies an unsigned value between 0 and (2^64)-1 to store with
+    /// the key. API consumers can use this field any way they choose for
+    /// their application.
+    pub flags: Option<u64>,
+
+    /// Specifies to use a Check-And-Set operation. This is very useful as a
+    /// building block for more complex synchronization primitives. If the
+    /// index is 0, Consul will only put the key if it does not already exist.
+    /// If the index is non-zero, the key is only set if the index matches the
+    /// ModifyIndex of that key.
+    pub cas: Option<u64>,
+
+    /// Supply a session ID to use in a lock acquisition operation. This is
+    /// useful as it allows leader election to be built on top of Consul. If
+    /// the lock is not held and the session is valid, this increments the
+    /// LockIndex and sets the Session value of the key in addition to updating
+    /// the key contents. A key does not need to exist to be acquired. If the
+    /// lock is already held by the given session, then the LockIndex is not
+    /// incremented but the key contents are updated. This lets the current
+    /// lock holder update the key contents without having to give up the lock
+    /// and reacquire it. Note that an update that does not include the acquire
+    /// parameter will proceed normally even if another session has locked the
+    /// key.
+    pub acquire: Option<String>,
+
+    /// Supply a session ID to use in a release operation. This is useful when
+    /// paired with ?acquire= as it allows clients to yield a lock. This will
+    /// leave the LockIndex unmodified but will clear the associated Session of
+    /// the key. The key must be held by this session to be unlocked.
+    pub release: Option<String>,
+
+    #[cfg(feature = "enterprise")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ns: Option<String>,
+
+    #[cfg(feature = "enterprise")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partition: Option<String>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct KVDeleteKeyRequestQuery {
+    /// Specifies the path of the key to delete.
+    #[serde(skip_serializing)]
+    pub key: String,
+
+    /// Specifies the datacenter to query. This will default to the datacenter
+    /// of the agent being queried. If the DC is invalid, the error "No path to
+    /// datacenter" is returned.
+    pub dc: Option<String>,
+
+    /// Specifies to delete all keys which have the specified prefix. Without
+    /// this, only a key with an exact match will be deleted.
+    pub recurse: Option<bool>,
+
+    /// Specifies to use a Check-And-Set operation. This is very useful as a
+    /// building block for more complex synchronization primitives. Unlike PUT,
+    /// the index must be greater than 0 for Consul to take any action: a 0
+    /// index will not delete the key. If the index is non-zero, the key is
+    /// only deleted if the index matches the ModifyIndex of that key.
+    pub cas: Option<u64>,
+
+    #[cfg(feature = "enterprise")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ns: Option<String>,
+
+    #[cfg(feature = "enterprise")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partition: Option<String>,
+}
+
+pub struct Client {
     cfg: Config,
-    requester: Client,
+    http: reqwest::Client,
     prefix: String,
 }
 
-impl AgentClient {
+impl Client {
     pub fn new() -> Self {
-        AgentBuilder::new(Config::default()).build().unwrap()
+        ClientBuilder::new(Config::default()).build().unwrap()
     }
 
     /// List Checks
@@ -237,7 +365,7 @@ impl AgentClient {
         &self,
         q: &FilterRequestQuery,
     ) -> Result<HashMap<String, structs::HealthCheck>> {
-        self.execute_request(Method::GET, "/agent/checks", q, &())
+        self.execute_request(Method::GET, "/agent/checks", q, None, &())
             .await
     }
 
@@ -246,7 +374,7 @@ impl AgentClient {
     /// HTTP, TCP, UDP, or TTL type. The agent is responsible for managing the
     /// status of the check and keeping the Catalog in sync.
     pub async fn check_register(&self, b: &structs::CheckDefinition) -> Result<()> {
-        self.execute_request(Method::PUT, "/agent/check/register", &(), b)
+        self.execute_request(Method::PUT, "/agent/check/register", &(), None, b)
             .await
     }
 
@@ -256,7 +384,7 @@ impl AgentClient {
     /// does not exist, no action is taken.
     pub async fn deregister_check(&self, q: &DeregisterCheckRequestQuery) -> Result<()> {
         let path = format!("/agent/check/deregister/{}", q.check_id);
-        self.execute_request(Method::PUT, &path, q, &()).await
+        self.execute_request(Method::PUT, &path, q, None, &()).await
     }
 
     /// TTL Check Pass
@@ -264,7 +392,7 @@ impl AgentClient {
     /// to passing and to reset the TTL clock.
     pub async fn check_pass(&self, q: &AgentTTLCheckRequestQuery) -> Result<()> {
         let path = format!("/agent/check/pass/{}", q.check_id);
-        self.execute_request(Method::PUT, &path, q, &()).await
+        self.execute_request(Method::PUT, &path, q, None, &()).await
     }
 
     /// TTL Check Warn
@@ -272,7 +400,7 @@ impl AgentClient {
     /// to warning and to reset the TTL clock.
     pub async fn check_warn(&self, q: &AgentTTLCheckRequestQuery) -> Result<()> {
         let path = format!("/agent/check/warn/{}", q.check_id);
-        self.execute_request(Method::PUT, &path, q, &()).await
+        self.execute_request(Method::PUT, &path, q, None, &()).await
     }
 
     /// TTL Check Fail
@@ -280,7 +408,7 @@ impl AgentClient {
     /// to critical and to reset the TTL clock.
     pub async fn check_fail(&self, q: &AgentTTLCheckRequestQuery) -> Result<()> {
         let path = format!("/agent/check/fail/{}", q.check_id);
-        self.execute_request(Method::PUT, &path, q, &()).await
+        self.execute_request(Method::PUT, &path, q, None, &()).await
     }
 
     /// TTL Check Update
@@ -292,7 +420,7 @@ impl AgentClient {
         b: &AgentTTLCheckUpdateRequestBody,
     ) -> Result<()> {
         let path = format!("/agent/check/update/{}", q.check_id);
-        self.execute_request(Method::PUT, &path, q, b).await
+        self.execute_request(Method::PUT, &path, q, None, b).await
     }
 
     /// List Services
@@ -303,7 +431,7 @@ impl AgentClient {
         &self,
         q: &FilterRequestQuery,
     ) -> Result<HashMap<String, structs::NodeService>> {
-        self.execute_request(Method::GET, "/agent/services", q, &())
+        self.execute_request(Method::GET, "/agent/services", q, None, &())
             .await
     }
 
@@ -312,7 +440,7 @@ impl AgentClient {
         q: &ServiceConfigurationRequestQuery,
     ) -> Result<structs::NodeService> {
         let path = format!("/agent/service/{}", q.service_id);
-        self.execute_request(Method::GET, &path, q, &()).await
+        self.execute_request(Method::GET, &path, q, None, &()).await
     }
 
     /// Get local service health
@@ -325,9 +453,9 @@ impl AgentClient {
     pub async fn local_service_health_by_name(
         &self,
         q: &LocalServiceHealthByNameRequestQuery,
-    ) -> Result<Vec<structs::NodeService>> {
+    ) -> Result<Vec<structs::AgentServiceChecksInfo>> {
         let path = format!("/agent/health/service/name/{}", q.service_name);
-        self.execute_request(Method::GET, &path, q, &()).await
+        self.execute_request(Method::GET, &path, q, None, &()).await
     }
 
     /// Get local service health by ID
@@ -338,7 +466,7 @@ impl AgentClient {
         q: &LocalServiceHealthByIDRequestQuery,
     ) -> Result<structs::NodeService> {
         let path = format!("/agent/health/service/id/{}", q.service_id);
-        self.execute_request(Method::GET, &path, q, &()).await
+        self.execute_request(Method::GET, &path, q, None, &()).await
     }
 
     /// Register Service
@@ -348,12 +476,12 @@ impl AgentClient {
     /// The agent is responsible for managing the status of its local services, and
     /// for sending updates about its local services to the servers to keep the
     /// global catalog in sync.
-    pub async fn register_service(
+    pub async fn agent_register_service(
         &self,
         q: &RegisterServiceRequestQuery,
         b: &structs::ServiceDefinition,
-    ) -> Result<structs::NodeService> {
-        self.execute_request(Method::PUT, "/agent/service/register", q, b)
+    ) -> Result<()> {
+        self.execute_request(Method::PUT, "/agent/service/register", q, None, b)
             .await
     }
 
@@ -365,7 +493,7 @@ impl AgentClient {
     /// If there is an associated check, that is also deregistered.
     pub async fn deregister_service(&self, q: &DeregisterServiceRequestQuery) -> Result<()> {
         let path = format!("/agent/service/deregister/{}", q.service_id);
-        self.execute_request(Method::PUT, &path, q, &()).await
+        self.execute_request(Method::PUT, &path, q, None, &()).await
     }
 
     /// Enable Maintenance Mode
@@ -380,7 +508,7 @@ impl AgentClient {
         q: &EnableMaintenanceModeRequestQuery,
     ) -> Result<structs::NodeService> {
         let path = format!("/agent/service/maintenance/{}", q.service_id);
-        self.execute_request(Method::PUT, &path, q, &()).await
+        self.execute_request(Method::PUT, &path, q, None, &()).await
     }
 
     pub async fn connect_authorize(
@@ -388,7 +516,36 @@ impl AgentClient {
         q: &ConnectAuthorizeRequestQuery,
         b: &structs::ConnectAuthorizeRequest,
     ) -> Result<ConnectAuthorizeRequestReply> {
-        self.execute_request(Method::POST, "/agent/connect/authorize", q, b)
+        self.execute_request(Method::POST, "/agent/connect/authorize", q, None, b)
+            .await
+    }
+
+    /// Read Key
+    /// This endpoint returns the specified key. If no key exists at the given
+    /// path, a 404 is returned instead of a 200 response.
+    pub async fn kv_read_key(&self, q: &KVReadKeyRequestQuery) -> Result<Option<Vec<String>>> {
+        let path = format!("/kv/{}", q.key);
+        self.execute_request(Method::GET, &path, q, None, &()).await
+    }
+
+    /// Create/Update Key
+    /// This endpoint updates the value of the specified key. If no key exists
+    /// at the given path, the key will be created.
+    pub async fn kv_create_or_update_key(
+        &self,
+        q: &KVCreateOrUpdateKeyRequestQuery,
+        b: Vec<u8>,
+    ) -> Result<bool> {
+        let path = format!("/kv/{}", q.key);
+        self.execute_request(Method::PUT, &path, q, Some(b), &())
+            .await
+    }
+
+    /// Delete Key
+    /// This endpoint deletes a single key or all keys sharing a prefix.
+    pub async fn kv_delete_key(&self, q: &KVDeleteKeyRequestQuery) -> Result<bool> {
+        let path = format!("/kv/{}", q.key);
+        self.execute_request(Method::DELETE, &path, q, None, &())
             .await
     }
 
@@ -397,20 +554,44 @@ impl AgentClient {
         method: Method,
         path: &str,
         query: &Q,
-        body: &B,
+        raw_body: Option<Vec<u8>>,
+        json_body: &B,
     ) -> Result<T>
     where
         Q: Serialize,
         B: Serialize,
-        T: DeserializeOwned,
+        T: DeserializeOwned + Default,
     {
         let path = format!("{}{}{}", self.cfg.address, self.prefix, path);
-        let mut b = self.requester.request(method, path);
+        let mut b = self.http.request(method.clone(), &path);
+
         b = b.query(query);
-        b = b.json(body);
+
+        if method == Method::PUT || method == Method::POST {
+            if let Some(body) = raw_body {
+                b = b.body(body)
+            } else {
+                b = b.json(json_body);
+            }
+        }
 
         let resp = b.send().await?;
-        resp.json().await.map_err(|e| anyhow!(e))
+        println!("req.path {}", path);
+        println!("resp.status {}", resp.status());
+
+        let full = resp.bytes().await?;
+        println!("resp.body {:?}", full);
+
+        if full.is_empty() {
+            return Ok(T::default());
+        }
+
+        serde_json::from_slice(&full).map_err(|e| anyhow!(e))
+        // println!(
+        //     "resp.bytes {:?}",
+        //     resp.bytes().await.unwrap_or(Default::default())
+        // );
+        // resp.json().await.map_err(|e| anyhow!(e))
     }
 }
 

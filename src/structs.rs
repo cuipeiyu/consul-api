@@ -3,7 +3,7 @@
 // Manual changes may cause issues with the program's operation.
 // If modifications are needed, please do so through the program's logic.
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MeshGatewayMode {
@@ -122,6 +122,470 @@ impl ::core::fmt::Display for MutualTLSMode {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum UpstreamDestType {
+    None,
+    Service,
+    PreparedQuery,
+}
+
+impl Default for UpstreamDestType {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
+impl ::core::fmt::Display for UpstreamDestType {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+        match self {
+            Self::None => write!(f, ""),
+            Self::Service => write!(f, "service"),
+            Self::PreparedQuery => write!(f, "prepared_query"),
+        }
+    }
+}
+
+/// AgentWeights represent optional weights for a service
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AgentWeights {
+    #[serde(rename = "Passing")]
+    pub passing: isize,
+
+    #[serde(rename = "Warning")]
+    pub warning: isize,
+
+}
+
+/// AgentService represents a service known to the agent
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AgentService {
+    #[serde(rename = "Kind")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+
+    #[serde(rename = "ID")]
+    pub id: String,
+
+    #[serde(rename = "Service")]
+    pub service: String,
+
+    #[serde(rename = "Tags")]
+    pub tags: Vec<String>,
+
+    #[serde(rename = "Meta")]
+    pub meta: ::std::collections::HashMap<String, String>,
+
+    #[serde(rename = "Port")]
+    pub port: u16,
+
+    #[serde(rename = "Address")]
+    pub address: String,
+
+    #[serde(rename = "SocketPath")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub socket_path: Option<String>,
+
+    #[serde(rename = "TaggedAddresses")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tagged_addresses: Option<::std::collections::HashMap<String, ServiceAddress>>,
+
+    #[serde(rename = "Weights")]
+    pub weights: AgentWeights,
+
+    #[serde(rename = "EnableTagOverride")]
+    pub enable_tag_override: bool,
+
+    #[serde(rename = "CreateIndex")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub create_index: Option<u64>,
+
+    #[serde(rename = "ModifyIndex")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub modify_index: Option<u64>,
+
+    #[serde(rename = "ContentHash")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_hash: Option<String>,
+
+    #[serde(rename = "Proxy")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proxy: Option<AgentServiceConnectProxyConfig>,
+
+    #[serde(rename = "Connect")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub connect: Option<AgentServiceConnect>,
+
+    #[serde(rename = "PeerName")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub peer_name: Option<String>,
+
+    /// NOTE: If we ever set the ContentHash outside of singular service lookup then we may need
+    /// to include the Namespace in the hash. When we do, then we are in for lots of fun with tests.
+    /// For now though, ignoring it works well enough.
+    #[serde(rename = "Namespace")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub namespace: Option<String>,
+
+    #[serde(rename = "Partition")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partition: Option<String>,
+
+    /// Datacenter is only ever returned and is ignored if presented.
+    #[serde(rename = "Datacenter")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub datacenter: Option<String>,
+
+    #[serde(rename = "Locality")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub locality: Option<Locality>,
+
+}
+
+/// AgentServiceChecksInfo returns information about a Service and its checks
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AgentServiceChecksInfo {
+    #[serde(rename = "AggregatedStatus")]
+    pub aggregated_status: String,
+
+    #[serde(rename = "Service")]
+    pub service: AgentService,
+
+    #[serde(rename = "Checks")]
+    pub checks: HealthChecks,
+
+}
+
+/// AgentServiceConnect represents the Connect configuration of a service.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AgentServiceConnect {
+    #[serde(rename = "Native")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub native: Option<bool>,
+
+    #[serde(rename = "SidecarService")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sidecar_service: Option<Box<AgentServiceRegistration>>,
+
+}
+
+/// AgentServiceConnectProxyConfig is the proxy configuration in a connect-proxy
+/// ServiceDefinition or response.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AgentServiceConnectProxyConfig {
+    #[serde(rename = "EnvoyExtensions")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub envoy_extensions: Option<Vec<EnvoyExtension>>,
+
+    #[serde(rename = "DestinationServiceName")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub destination_service_name: Option<String>,
+
+    #[serde(rename = "DestinationServiceID")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub destination_service_id: Option<String>,
+
+    #[serde(rename = "LocalServiceAddress")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub local_service_address: Option<String>,
+
+    #[serde(rename = "LocalServicePort")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub local_service_port: Option<isize>,
+
+    #[serde(rename = "LocalServiceSocketPath")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub local_service_socket_path: Option<String>,
+
+    #[serde(rename = "Mode")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mode: Option<ProxyMode>,
+
+    #[serde(rename = "TransparentProxy")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transparent_proxy: Option<TransparentProxyConfig>,
+
+    #[serde(rename = "Upstreams")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub upstreams: Option<Vec<Upstream>>,
+
+    #[serde(rename = "MeshGateway")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mesh_gateway: Option<MeshGatewayConfig>,
+
+    #[serde(rename = "Expose")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expose: Option<ExposeConfig>,
+
+    #[serde(rename = "AccessLogs")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub access_logs: Option<AccessLogsConfig>,
+
+}
+
+/// AgentServiceRegistration is used to register a new service
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AgentServiceRegistration {
+    #[serde(rename = "Kind")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+
+    #[serde(rename = "ID")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+
+    #[serde(rename = "Name")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+
+    #[serde(rename = "Tags")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
+
+    #[serde(rename = "Port")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub port: Option<u16>,
+
+    #[serde(rename = "Address")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub address: Option<String>,
+
+    #[serde(rename = "SocketPath")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub socket_path: Option<String>,
+
+    #[serde(rename = "TaggedAddresses")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tagged_addresses: Option<::std::collections::HashMap<String, ServiceAddress>>,
+
+    #[serde(rename = "EnableTagOverride")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable_tag_override: Option<bool>,
+
+    #[serde(rename = "Meta")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<::std::collections::HashMap<String, String>>,
+
+    #[serde(rename = "Weights")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub weights: Option<AgentWeights>,
+
+    #[serde(rename = "Check")]
+    pub check: AgentServiceCheck,
+
+    #[serde(rename = "Checks")]
+    pub checks: AgentServiceChecks,
+
+    #[serde(rename = "Proxy")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proxy: Option<AgentServiceConnectProxyConfig>,
+
+    #[serde(rename = "Connect")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub connect: Option<AgentServiceConnect>,
+
+    #[serde(rename = "Namespace")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub namespace: Option<String>,
+
+    #[serde(rename = "Partition")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partition: Option<String>,
+
+    #[serde(rename = "Locality")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub locality: Option<Locality>,
+
+}
+
+/// AgentServiceCheck is used to define a node or service level check
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AgentServiceCheck {
+    #[serde(rename = "CheckID")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub check_id: Option<String>,
+
+    #[serde(rename = "Name")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+
+    #[serde(rename = "Args")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub args: Option<Vec<String>>,
+
+    #[serde(rename = "DockerContainerID")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub docker_container_id: Option<String>,
+
+    #[serde(rename = "Shell")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shell: Option<String>,
+
+    #[serde(rename = "Interval")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interval: Option<String>,
+
+    #[serde(rename = "Timeout")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<String>,
+
+    #[serde(rename = "TTL")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ttl: Option<String>,
+
+    #[serde(rename = "HTTP")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub http: Option<String>,
+
+    #[serde(rename = "Header")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub header: Option<::std::collections::HashMap<String, Vec<String>>>,
+
+    #[serde(rename = "Method")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub method: Option<String>,
+
+    #[serde(rename = "Body")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub body: Option<String>,
+
+    #[serde(rename = "TCP")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tcp: Option<String>,
+
+    #[serde(rename = "TCPUseTLS")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tcp_use_tls: Option<bool>,
+
+    #[serde(rename = "UDP")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub udp: Option<String>,
+
+    #[serde(rename = "Status")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+
+    #[serde(rename = "Notes")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
+
+    #[serde(rename = "TLSServerName")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tls_server_name: Option<String>,
+
+    #[serde(rename = "TLSSkipVerify")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tls_skip_verify: Option<bool>,
+
+    #[serde(rename = "GRPC")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grpc: Option<String>,
+
+    #[serde(rename = "GRPCUseTLS")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grpc_use_tls: Option<bool>,
+
+    #[serde(rename = "H2PING")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub h2_ping: Option<String>,
+
+    #[serde(rename = "H2PingUseTLS")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub h2_ping_use_tls: Option<bool>,
+
+    #[serde(rename = "AliasNode")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alias_node: Option<String>,
+
+    #[serde(rename = "AliasService")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alias_service: Option<String>,
+
+    #[serde(rename = "SuccessBeforePassing")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub success_before_passing: Option<isize>,
+
+    #[serde(rename = "FailuresBeforeWarning")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub failures_before_warning: Option<isize>,
+
+    #[serde(rename = "FailuresBeforeCritical")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub failures_before_critical: Option<isize>,
+
+    /// In Consul 0.7 and later, checks that are associated with a service
+    /// may also contain this optional DeregisterCriticalServiceAfter field,
+    /// which is a timeout in the same Go time format as Interval and TTL. If
+    /// a check is in the critical state for more than this configured value,
+    /// then its associated service (and all of its associated checks) will
+    /// automatically be deregistered.
+    #[serde(rename = "DeregisterCriticalServiceAfter")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deregister_critical_service_after: Option<String>,
+
+}
+
+pub type AgentServiceChecks = Vec<AgentServiceCheck>;
+
+/// HealthCheck is used to represent a single check
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct HealthCheck {
+    #[serde(rename = "Node")]
+    pub node: String,
+
+    #[serde(rename = "CheckID")]
+    pub check_id: String,
+
+    #[serde(rename = "Name")]
+    pub name: String,
+
+    #[serde(rename = "Status")]
+    pub status: String,
+
+    #[serde(rename = "Notes")]
+    pub notes: String,
+
+    #[serde(rename = "Output")]
+    pub output: String,
+
+    #[serde(rename = "ServiceID")]
+    pub service_id: String,
+
+    #[serde(rename = "ServiceName")]
+    pub service_name: String,
+
+    #[serde(rename = "ServiceTags")]
+    pub service_tags: Vec<String>,
+
+    #[serde(rename = "Type")]
+    pub r#type: String,
+
+    #[serde(rename = "Namespace")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub namespace: Option<String>,
+
+    #[serde(rename = "Partition")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partition: Option<String>,
+
+    #[serde(rename = "ExposedPort")]
+    pub exposed_port: isize,
+
+    #[serde(rename = "PeerName")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub peer_name: Option<String>,
+
+    #[serde(rename = "Definition")]
+    pub definition: HealthCheckDefinition,
+
+    #[serde(rename = "CreateIndex")]
+    pub create_index: u64,
+
+    #[serde(rename = "ModifyIndex")]
+    pub modify_index: u64,
+
+}
+
+pub type HealthChecks = Vec<HealthCheck>;
 
 /// CheckDefinition is used to JSON decode the Check definitions
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -149,7 +613,7 @@ pub struct CheckDefinition {
     /// 
     ///   ID (CheckID), Name, Status, Notes
     #[serde(rename = "ScriptArgs")]
-    pub script_args: String,
+    pub script_args: Vec<String>,
 
     #[serde(rename = "HTTP")]
     pub http: String,
@@ -161,7 +625,7 @@ pub struct CheckDefinition {
     pub h2_ping_use_tls: bool,
 
     #[serde(rename = "Header")]
-    pub header: ::std::collections::HashMap<String, String>,
+    pub header: ::std::collections::HashMap<String, Vec<String>>,
 
     #[serde(rename = "Method")]
     pub method: String,
@@ -180,6 +644,57 @@ pub struct CheckDefinition {
 
     #[serde(rename = "UDP")]
     pub udp: String,
+
+    #[serde(rename = "Interval")]
+    pub interval: Option<String>,
+
+    #[serde(rename = "DockerContainerID")]
+    pub docker_container_id: String,
+
+    #[serde(rename = "Shell")]
+    pub shell: String,
+
+    #[serde(rename = "GRPC")]
+    pub grpc: String,
+
+    #[serde(rename = "GRPCUseTLS")]
+    pub grpc_use_tls: bool,
+
+    #[serde(rename = "OSService")]
+    pub os_service: String,
+
+    #[serde(rename = "TLSServerName")]
+    pub tls_server_name: String,
+
+    #[serde(rename = "TLSSkipVerify")]
+    pub tls_skip_verify: bool,
+
+    #[serde(rename = "AliasNode")]
+    pub alias_node: String,
+
+    #[serde(rename = "AliasService")]
+    pub alias_service: String,
+
+    #[serde(rename = "Timeout")]
+    pub timeout: Option<String>,
+
+    #[serde(rename = "TTL")]
+    pub ttl: Option<String>,
+
+    #[serde(rename = "SuccessBeforePassing")]
+    pub success_before_passing: isize,
+
+    #[serde(rename = "FailuresBeforeWarning")]
+    pub failures_before_warning: isize,
+
+    #[serde(rename = "FailuresBeforeCritical")]
+    pub failures_before_critical: isize,
+
+    #[serde(rename = "DeregisterCriticalServiceAfter")]
+    pub deregister_critical_service_after: Option<String>,
+
+    #[serde(rename = "OutputMaxSize")]
+    pub output_max_size: isize,
 
 }
 
@@ -205,7 +720,7 @@ pub struct CheckType {
     pub notes: String,
 
     #[serde(rename = "ScriptArgs")]
-    pub script_args: String,
+    pub script_args: Vec<String>,
 
     #[serde(rename = "HTTP")]
     pub http: String,
@@ -217,7 +732,7 @@ pub struct CheckType {
     pub h2_ping_use_tls: bool,
 
     #[serde(rename = "Header")]
-    pub header: ::std::collections::HashMap<String, String>,
+    pub header: ::std::collections::HashMap<String, Vec<String>>,
 
     #[serde(rename = "Method")]
     pub method: String,
@@ -236,6 +751,67 @@ pub struct CheckType {
 
     #[serde(rename = "UDP")]
     pub udp: String,
+
+    #[serde(rename = "Interval")]
+    pub interval: Option<String>,
+
+    #[serde(rename = "AliasNode")]
+    pub alias_node: String,
+
+    #[serde(rename = "AliasService")]
+    pub alias_service: String,
+
+    #[serde(rename = "DockerContainerID")]
+    pub docker_container_id: String,
+
+    #[serde(rename = "Shell")]
+    pub shell: String,
+
+    #[serde(rename = "GRPC")]
+    pub grpc: String,
+
+    #[serde(rename = "GRPCUseTLS")]
+    pub grpc_use_tls: bool,
+
+    #[serde(rename = "OSService")]
+    pub os_service: String,
+
+    #[serde(rename = "TLSServerName")]
+    pub tls_server_name: String,
+
+    #[serde(rename = "TLSSkipVerify")]
+    pub tls_skip_verify: bool,
+
+    #[serde(rename = "Timeout")]
+    pub timeout: Option<String>,
+
+    #[serde(rename = "TTL")]
+    pub ttl: Option<String>,
+
+    #[serde(rename = "SuccessBeforePassing")]
+    pub success_before_passing: isize,
+
+    #[serde(rename = "FailuresBeforeWarning")]
+    pub failures_before_warning: isize,
+
+    #[serde(rename = "FailuresBeforeCritical")]
+    pub failures_before_critical: isize,
+
+    /// Definition fields used when exposing checks through a proxy
+    #[serde(rename = "ProxyHTTP")]
+    pub proxy_http: String,
+
+    #[serde(rename = "ProxyGRPC")]
+    pub proxy_grpc: String,
+
+    /// DeregisterCriticalServiceAfter, if >0, will cause the associated
+    /// service, if any, to be deregistered if this check is critical for
+    /// longer than this duration.
+    #[serde(rename = "DeregisterCriticalServiceAfter")]
+    pub deregister_critical_service_after: Option<String>,
+
+    #[serde(rename = "OutputMaxSize")]
+    pub output_max_size: isize,
 
 }
 
@@ -337,7 +913,7 @@ pub struct ConnectProxyConfig {
     /// EnvoyExtensions are the list of Envoy extensions configured for the local service.
     #[serde(rename = "EnvoyExtensions")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub envoy_extensions: Option<EnvoyExtension>,
+    pub envoy_extensions: Option<Vec<EnvoyExtension>>,
 
     /// DestinationServiceName is required and is the name of the service to accept
     /// traffic for.
@@ -402,10 +978,6 @@ pub struct ConnectProxyConfig {
     #[serde(rename = "TransparentProxy")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transparent_proxy: Option<TransparentProxyConfig>,
-
-    /// MutualTLSMode allows configuring the proxy to allow non-mTLS traffic.
-    #[serde(rename = "MutualTLSMode")]
-    pub mutual_tls_mode: MutualTLSMode,
 
     /// AccessLogs configures the output and format of Envoy access logs
     #[serde(rename = "AccessLogs")]
@@ -478,14 +1050,6 @@ pub struct Upstream {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mesh_gateway: Option<MeshGatewayConfig>,
 
-    /// IngressHosts are a list of hosts that should route to this upstream from an
-    /// ingress gateway. This cannot and should not be set by a user, it is used
-    /// internally to store the association of hosts to an upstream service.
-    /// TODO(banks): we shouldn't need this any more now we pass through full
-    /// listener config in the ingress snapshot.
-    #[serde(rename = "IngressHosts")]
-    pub ingress_hosts: String,
-
     /// CentrallyConfigured indicates whether the upstream was defined in a proxy
     /// instance registration or whether it was generated from a config entry.
     #[serde(rename = "CentrallyConfigured")]
@@ -509,7 +1073,7 @@ pub struct ExposeConfig {
     /// Paths is the list of paths exposed through the proxy.
     #[serde(rename = "Paths")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub paths: Option<ExposePath>,
+    pub paths: Option<Vec<ExposePath>>,
 
 }
 
@@ -564,10 +1128,6 @@ pub struct EnvoyExtension {
 /// documentation on specific fields see NodeService which is better documented.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ServiceDefinition {
-    #[serde(rename = "Kind")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub kind: Option<String>,
-
     #[serde(rename = "ID")]
     pub id: String,
 
@@ -575,7 +1135,7 @@ pub struct ServiceDefinition {
     pub name: String,
 
     #[serde(rename = "Tags")]
-    pub tags: String,
+    pub tags: Vec<String>,
 
     #[serde(rename = "Address")]
     pub address: String,
@@ -599,8 +1159,7 @@ pub struct ServiceDefinition {
     pub checks: CheckTypes,
 
     #[serde(rename = "Weights")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub weights: Option<Weights>,
+    pub weights: Weights,
 
     #[serde(rename = "Token")]
     pub token: String,
@@ -609,8 +1168,7 @@ pub struct ServiceDefinition {
     pub enable_tag_override: bool,
 
     #[serde(rename = "Locality")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub locality: Option<Locality>,
+    pub locality: Locality,
 
     /// Proxy is the configuration set for Kind = connect-proxy. It is mandatory in
     /// that case and an error to be set for any other kind. This config is part of
@@ -618,12 +1176,10 @@ pub struct ServiceDefinition {
     /// it's confusing for the UX because one of the fields in ConnectProxyConfig is
     /// also called just "Config"
     #[serde(rename = "Proxy")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub proxy: Option<ConnectProxyConfig>,
+    pub proxy: ConnectProxyConfig,
 
     #[serde(rename = "Connect")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub connect: Option<Box<ServiceConnect>>,
+    pub connect: Box<ServiceConnect>,
 
 }
 
@@ -654,6 +1210,83 @@ pub struct QueryOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_query_index: Option<u64>,
 
+    /// Provided with MinQueryIndex to wait for change.
+    #[serde(rename = "MaxQueryTime")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_query_time: Option<Option<String>>,
+
+    /// If set, any follower can service the request. Results
+    /// may be arbitrarily stale.
+    #[serde(rename = "AllowStale")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allow_stale: Option<bool>,
+
+    /// If set, the leader must verify leadership prior to
+    /// servicing the request. Prevents a stale read.
+    #[serde(rename = "RequireConsistent")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub require_consistent: Option<bool>,
+
+    /// If set, the local agent may respond with an arbitrarily stale locally
+    /// cached response. The semantics differ from AllowStale since the agent may
+    /// be entirely partitioned from the servers and still considered "healthy" by
+    /// operators. Stale responses from Servers are also arbitrarily stale, but can
+    /// provide additional bounds on the last contact time from the leader. It's
+    /// expected that servers that are partitioned are noticed and replaced in a
+    /// timely way by operators while the same may not be true for client agents.
+    #[serde(rename = "UseCache")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub use_cache: Option<bool>,
+
+    /// If set and AllowStale is true, will try first a stale
+    /// read, and then will perform a consistent read if stale
+    /// read is older than value.
+    #[serde(rename = "MaxStaleDuration")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_stale_duration: Option<Option<String>>,
+
+    /// MaxAge limits how old a cached value will be returned if UseCache is true.
+    /// If there is a cached response that is older than the MaxAge, it is treated
+    /// as a cache miss and a new fetch invoked. If the fetch fails, the error is
+    /// returned. Clients that wish to allow for stale results on error can set
+    /// StaleIfError to a longer duration to change this behavior. It is ignored
+    /// if the endpoint supports background refresh caching. See
+    /// https://www.consul.io/api/index.html#agent-caching for more details.
+    #[serde(rename = "MaxAge")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_age: Option<Option<String>>,
+
+    /// MustRevalidate forces the agent to fetch a fresh version of a cached
+    /// resource or at least validate that the cached version is still fresh. It is
+    /// implied by either max-age=0 or must-revalidate Cache-Control headers. It
+    /// only makes sense when UseCache is true. We store it since MaxAge = 0 is the
+    /// default unset value.
+    #[serde(rename = "MustRevalidate")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub must_revalidate: Option<bool>,
+
+    /// StaleIfError specifies how stale the client will accept a cached response
+    /// if the servers are unavailable to fetch a fresh one. Only makes sense when
+    /// UseCache is true and MaxAge is set to a lower, non-zero value. It is
+    /// ignored if the endpoint supports background refresh caching. See
+    /// https://www.consul.io/api/index.html#agent-caching for more details.
+    #[serde(rename = "StaleIfError")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stale_if_error: Option<Option<String>>,
+
+    /// Filter specifies the go-bexpr filter expression to be used for
+    /// filtering the data prior to returning a response
+    #[serde(rename = "Filter")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filter: Option<String>,
+
+    /// AllowNotModifiedResponse indicates that if the MinIndex matches the
+    /// QueryMeta.Index, the response can be left empty and QueryMeta.NotModified
+    /// will be set to true to indicate the result of the query has not changed.
+    #[serde(rename = "AllowNotModifiedResponse")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allow_not_modified_response: Option<bool>,
+
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -666,7 +1299,7 @@ pub struct WriteRequest {
 }
 
 /// Weights represent the weight used by DNS for a given status
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Weights {
     #[serde(rename = "Passing")]
     pub passing: isize,
@@ -674,6 +1307,18 @@ pub struct Weights {
     #[serde(rename = "Warning")]
     pub warning: isize,
 
+}
+
+/// Specifies weights for the service.
+/// Default is {"Passing": 1, "Warning": 1}.
+/// see more: https://developer.hashicorp.com/consul/api-docs/agent/service#weights
+impl Default for Weights {
+    fn default() -> Self {
+        Self {
+            passing: 1,
+            warning: 1,
+        }
+    }
 }
 
 /// Type to hold a address and port of a service
@@ -704,7 +1349,7 @@ pub struct NodeService {
     pub service: String,
 
     #[serde(rename = "Tags")]
-    pub tags: String,
+    pub tags: Vec<String>,
 
     #[serde(rename = "Address")]
     pub address: String,
@@ -725,8 +1370,7 @@ pub struct NodeService {
     pub socket_path: Option<String>,
 
     #[serde(rename = "Weights")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub weights: Option<Weights>,
+    pub weights: Weights,
 
     #[serde(rename = "EnableTagOverride")]
     pub enable_tag_override: bool,
@@ -748,27 +1392,6 @@ pub struct NodeService {
     #[serde(rename = "Connect")]
     pub connect: Box<ServiceConnect>,
 
-    /// TODO: rename to reflect that this is used to express future intent to register.
-    /// LocallyRegisteredAsSidecar is private as it is only used by a local agent
-    /// state to track if the service was or will be registered from a nested sidecar_service
-    /// block. We need to track that so we can know whether we need to deregister
-    /// it automatically too if it's removed from the service definition or if the
-    /// parent service is deregistered. Relying only on ID would cause us to
-    /// deregister regular services if they happen to be registered using the same
-    /// ID scheme as our sidecars do by default. We could use meta but that gets
-    /// unpleasant because we can't use the consul- prefix from an agent (reserved
-    /// for use internally but in practice that means within the state store or in
-    /// responses only), and it leaks the detail publicly which people might rely
-    /// on which is a bit unpleasant for something that is meant to be config-file
-    /// syntax sugar. Note this is not translated to ServiceNode and friends and
-    /// may not be set on a NodeService that isn't the one the agent registered and
-    /// keeps in it's local state. We never want this rendered in JSON as it's
-    /// internal only. Right now our agent endpoints return api structs which don't
-    /// include it but this is a safety net incase we change that or there is
-    /// somewhere this is used in API output.
-    #[serde(rename = "LocallyRegisteredAsSidecar")]
-    pub locally_registered_as_sidecar: bool,
-
     /// If not empty, PeerName represents the peer that the NodeService was imported from.
     #[serde(rename = "PeerName")]
     pub peer_name: String,
@@ -783,11 +1406,11 @@ pub struct NodeService {
 pub struct PeeringServiceMeta {
     #[serde(rename = "SNI")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub sni: Option<String>,
+    pub sni: Option<Vec<String>>,
 
     #[serde(rename = "SpiffeID")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub spiffe_id: Option<String>,
+    pub spiffe_id: Option<Vec<String>>,
 
     #[serde(rename = "Protocol")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -821,64 +1444,6 @@ pub struct ServiceConnect {
 
 }
 
-/// HealthCheck represents a single check on a given node.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct HealthCheck {
-    #[serde(rename = "Node")]
-    pub node: String,
-
-    #[serde(rename = "CheckID")]
-    pub check_id: String,
-
-    #[serde(rename = "Name")]
-    pub name: String,
-
-    #[serde(rename = "Status")]
-    pub status: String,
-
-    #[serde(rename = "Notes")]
-    pub notes: String,
-
-    #[serde(rename = "Output")]
-    pub output: String,
-
-    #[serde(rename = "ServiceID")]
-    pub service_id: String,
-
-    #[serde(rename = "ServiceName")]
-    pub service_name: String,
-
-    #[serde(rename = "ServiceTags")]
-    pub service_tags: String,
-
-    #[serde(rename = "Type")]
-    pub r#type: String,
-
-    #[serde(rename = "Interval")]
-    pub interval: String,
-
-    #[serde(rename = "Timeout")]
-    pub timeout: String,
-
-    /// ExposedPort is the port of the exposed Envoy listener representing the
-    /// HTTP or GRPC health check of the service.
-    #[serde(rename = "ExposedPort")]
-    pub exposed_port: isize,
-
-    /// PeerName is the name of the peer the check was imported from.
-    /// It is empty if the check was registered locally.
-    #[serde(rename = "PeerName")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub peer_name: Option<String>,
-
-    #[serde(rename = "Definition")]
-    pub definition: HealthCheckDefinition,
-
-    #[serde(rename = "RaftIndex")]
-    pub raft_index: RaftIndex,
-
-}
-
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct HealthCheckDefinition {
     #[serde(rename = "HTTP")]
@@ -895,7 +1460,7 @@ pub struct HealthCheckDefinition {
 
     #[serde(rename = "Header")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub header: Option<::std::collections::HashMap<String, String>>,
+    pub header: Option<::std::collections::HashMap<String, Vec<String>>>,
 
     #[serde(rename = "Method")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -932,6 +1497,54 @@ pub struct HealthCheckDefinition {
     #[serde(rename = "H2PingUseTLS")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub h2_ping_use_tls: Option<bool>,
+
+    #[serde(rename = "Interval")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interval: Option<Option<String>>,
+
+    #[serde(rename = "OutputMaxSize")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_max_size: Option<usize>,
+
+    #[serde(rename = "Timeout")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<Option<String>>,
+
+    #[serde(rename = "DeregisterCriticalServiceAfter")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deregister_critical_service_after: Option<Option<String>>,
+
+    #[serde(rename = "ScriptArgs")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub script_args: Option<Vec<String>>,
+
+    #[serde(rename = "DockerContainerID")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub docker_container_id: Option<String>,
+
+    #[serde(rename = "Shell")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shell: Option<String>,
+
+    #[serde(rename = "GRPC")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grpc: Option<String>,
+
+    #[serde(rename = "GRPCUseTLS")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grpc_use_tls: Option<bool>,
+
+    #[serde(rename = "AliasNode")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alias_node: Option<String>,
+
+    #[serde(rename = "AliasService")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alias_service: Option<String>,
+
+    #[serde(rename = "TTL")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ttl: Option<Option<String>>,
 
 }
 

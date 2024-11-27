@@ -3,7 +3,7 @@
 use anyhow::{anyhow, Result};
 use reqwest::{
     header::{HeaderMap, HeaderValue, AUTHORIZATION},
-    Method,
+    Method, Response, StatusCode,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::collections::HashMap;
@@ -365,8 +365,11 @@ impl Client {
         &self,
         q: &FilterRequestQuery,
     ) -> Result<HashMap<String, structs::HealthCheck>> {
-        self.execute_request(Method::GET, "/agent/checks", q, None, &())
-            .await
+        let resp = self
+            .execute_request(Method::GET, "/agent/checks", q, None, &())
+            .await?;
+
+        resp.json().await.map_err(|e| anyhow!(e))
     }
 
     /// Register Check
@@ -374,8 +377,10 @@ impl Client {
     /// HTTP, TCP, UDP, or TTL type. The agent is responsible for managing the
     /// status of the check and keeping the Catalog in sync.
     pub async fn check_register(&self, b: &structs::CheckDefinition) -> Result<()> {
-        self.execute_request(Method::PUT, "/agent/check/register", &(), None, b)
-            .await
+        let resp = self
+            .execute_request(Method::PUT, "/agent/check/register", &(), None, b)
+            .await?;
+        resp.json().await.map_err(|e| anyhow!(e))
     }
 
     /// Deregister Check
@@ -384,15 +389,22 @@ impl Client {
     /// does not exist, no action is taken.
     pub async fn deregister_check(&self, q: &DeregisterCheckRequestQuery) -> Result<()> {
         let path = format!("/agent/check/deregister/{}", q.check_id);
-        self.execute_request(Method::PUT, &path, q, None, &()).await
+        let resp = self
+            .execute_request(Method::PUT, &path, q, None, &())
+            .await?;
+        resp.json().await.map_err(|e| anyhow!(e))
     }
 
     /// TTL Check Pass
     /// This endpoint is used with a TTL type check to set the status of the check
     /// to passing and to reset the TTL clock.
-    pub async fn check_pass(&self, q: &AgentTTLCheckRequestQuery) -> Result<()> {
+    pub async fn check_pass(&self, q: &AgentTTLCheckRequestQuery) -> Result<bool> {
         let path = format!("/agent/check/pass/{}", q.check_id);
-        self.execute_request(Method::PUT, &path, q, None, &()).await
+        let resp = self
+            .execute_request(Method::PUT, &path, q, None, &())
+            .await?;
+
+        Ok(resp.status() == StatusCode::OK)
     }
 
     /// TTL Check Warn
@@ -400,15 +412,21 @@ impl Client {
     /// to warning and to reset the TTL clock.
     pub async fn check_warn(&self, q: &AgentTTLCheckRequestQuery) -> Result<()> {
         let path = format!("/agent/check/warn/{}", q.check_id);
-        self.execute_request(Method::PUT, &path, q, None, &()).await
+        let resp = self
+            .execute_request(Method::PUT, &path, q, None, &())
+            .await?;
+        resp.json().await.map_err(|e| anyhow!(e))
     }
 
     /// TTL Check Fail
     /// This endpoint is used with a TTL type check to set the status of the check
     /// to critical and to reset the TTL clock.
-    pub async fn check_fail(&self, q: &AgentTTLCheckRequestQuery) -> Result<()> {
+    pub async fn check_fail(&self, q: &AgentTTLCheckRequestQuery) -> Result<bool> {
         let path = format!("/agent/check/fail/{}", q.check_id);
-        self.execute_request(Method::PUT, &path, q, None, &()).await
+        let resp = self
+            .execute_request(Method::PUT, &path, q, None, &())
+            .await?;
+        Ok(resp.status() == StatusCode::OK)
     }
 
     /// TTL Check Update
@@ -418,9 +436,10 @@ impl Client {
         &self,
         q: &AgentTTLCheckUpdateRequestQuery,
         b: &AgentTTLCheckUpdateRequestBody,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         let path = format!("/agent/check/update/{}", q.check_id);
-        self.execute_request(Method::PUT, &path, q, None, b).await
+        let resp = self.execute_request(Method::PUT, &path, q, None, b).await?;
+        Ok(resp.status() == StatusCode::OK)
     }
 
     /// List Services
@@ -431,8 +450,10 @@ impl Client {
         &self,
         q: &FilterRequestQuery,
     ) -> Result<HashMap<String, structs::NodeService>> {
-        self.execute_request(Method::GET, "/agent/services", q, None, &())
-            .await
+        let resp = self
+            .execute_request(Method::GET, "/agent/services", q, None, &())
+            .await?;
+        resp.json().await.map_err(|e| anyhow!(e))
     }
 
     pub async fn service_configuration(
@@ -440,7 +461,10 @@ impl Client {
         q: &ServiceConfigurationRequestQuery,
     ) -> Result<structs::NodeService> {
         let path = format!("/agent/service/{}", q.service_id);
-        self.execute_request(Method::GET, &path, q, None, &()).await
+        let resp = self
+            .execute_request(Method::GET, &path, q, None, &())
+            .await?;
+        resp.json().await.map_err(|e| anyhow!(e))
     }
 
     /// Get local service health
@@ -455,7 +479,10 @@ impl Client {
         q: &LocalServiceHealthByNameRequestQuery,
     ) -> Result<Vec<structs::AgentServiceChecksInfo>> {
         let path = format!("/agent/health/service/name/{}", q.service_name);
-        self.execute_request(Method::GET, &path, q, None, &()).await
+        let resp = self
+            .execute_request(Method::GET, &path, q, None, &())
+            .await?;
+        resp.json().await.map_err(|e| anyhow!(e))
     }
 
     /// Get local service health by ID
@@ -466,7 +493,10 @@ impl Client {
         q: &LocalServiceHealthByIDRequestQuery,
     ) -> Result<structs::NodeService> {
         let path = format!("/agent/health/service/id/{}", q.service_id);
-        self.execute_request(Method::GET, &path, q, None, &()).await
+        let resp = self
+            .execute_request(Method::GET, &path, q, None, &())
+            .await?;
+        resp.json().await.map_err(|e| anyhow!(e))
     }
 
     /// Register Service
@@ -481,8 +511,10 @@ impl Client {
         q: &RegisterServiceRequestQuery,
         b: &structs::ServiceDefinition,
     ) -> Result<()> {
-        self.execute_request(Method::PUT, "/agent/service/register", q, None, b)
-            .await
+        let resp = self
+            .execute_request(Method::PUT, "/agent/service/register", q, None, b)
+            .await?;
+        resp.json().await.map_err(|e| anyhow!(e))
     }
 
     /// Deregister Service
@@ -493,7 +525,10 @@ impl Client {
     /// If there is an associated check, that is also deregistered.
     pub async fn deregister_service(&self, q: &DeregisterServiceRequestQuery) -> Result<()> {
         let path = format!("/agent/service/deregister/{}", q.service_id);
-        self.execute_request(Method::PUT, &path, q, None, &()).await
+        let resp = self
+            .execute_request(Method::PUT, &path, q, None, &())
+            .await?;
+        resp.json().await.map_err(|e| anyhow!(e))
     }
 
     /// Enable Maintenance Mode
@@ -508,7 +543,10 @@ impl Client {
         q: &EnableMaintenanceModeRequestQuery,
     ) -> Result<structs::NodeService> {
         let path = format!("/agent/service/maintenance/{}", q.service_id);
-        self.execute_request(Method::PUT, &path, q, None, &()).await
+        let resp = self
+            .execute_request(Method::PUT, &path, q, None, &())
+            .await?;
+        resp.json().await.map_err(|e| anyhow!(e))
     }
 
     pub async fn connect_authorize(
@@ -516,16 +554,32 @@ impl Client {
         q: &ConnectAuthorizeRequestQuery,
         b: &structs::ConnectAuthorizeRequest,
     ) -> Result<ConnectAuthorizeRequestReply> {
-        self.execute_request(Method::POST, "/agent/connect/authorize", q, None, b)
-            .await
+        let resp = self
+            .execute_request(Method::POST, "/agent/connect/authorize", q, None, b)
+            .await?;
+        resp.json().await.map_err(|e| anyhow!(e))
     }
 
     /// Read Key
     /// This endpoint returns the specified key. If no key exists at the given
     /// path, a 404 is returned instead of a 200 response.
-    pub async fn kv_read_key(&self, q: &KVReadKeyRequestQuery) -> Result<Option<Vec<String>>> {
+    pub async fn kv_read_key(&self, q: &KVReadKeyRequestQuery) -> Result<Option<Vec<u8>>> {
         let path = format!("/kv/{}", q.key);
-        self.execute_request(Method::GET, &path, q, None, &()).await
+        let resp = self
+            .execute_request(Method::GET, &path, q, None, &())
+            .await?;
+
+        if resp.status() == StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+
+        let full = resp.bytes().await?;
+
+        if full.is_empty() {
+            return Ok(Some(vec![]));
+        }
+
+        Ok(Some(full.to_vec()))
     }
 
     /// Create/Update Key
@@ -537,30 +591,33 @@ impl Client {
         b: Vec<u8>,
     ) -> Result<bool> {
         let path = format!("/kv/{}", q.key);
-        self.execute_request(Method::PUT, &path, q, Some(b), &())
-            .await
+        let resp = self
+            .execute_request(Method::PUT, &path, q, Some(b), &())
+            .await?;
+        resp.json().await.map_err(|e| anyhow!(e))
     }
 
     /// Delete Key
     /// This endpoint deletes a single key or all keys sharing a prefix.
     pub async fn kv_delete_key(&self, q: &KVDeleteKeyRequestQuery) -> Result<bool> {
         let path = format!("/kv/{}", q.key);
-        self.execute_request(Method::DELETE, &path, q, None, &())
-            .await
+        let resp = self
+            .execute_request(Method::DELETE, &path, q, None, &())
+            .await?;
+        resp.json().await.map_err(|e| anyhow!(e))
     }
 
-    async fn execute_request<Q, B, T>(
+    async fn execute_request<Q, B>(
         &self,
         method: Method,
         path: &str,
         query: &Q,
         raw_body: Option<Vec<u8>>,
         json_body: &B,
-    ) -> Result<T>
+    ) -> Result<Response>
     where
         Q: Serialize,
         B: Serialize,
-        T: DeserializeOwned + Default,
     {
         let path = format!("{}{}{}", self.cfg.address, self.prefix, path);
         let mut b = self.http.request(method.clone(), &path);
@@ -576,22 +633,7 @@ impl Client {
         }
 
         let resp = b.send().await?;
-        println!("req.path {}", path);
-        println!("resp.status {}", resp.status());
-
-        let full = resp.bytes().await?;
-        println!("resp.body {:?}", full);
-
-        if full.is_empty() {
-            return Ok(T::default());
-        }
-
-        serde_json::from_slice(&full).map_err(|e| anyhow!(e))
-        // println!(
-        //     "resp.bytes {:?}",
-        //     resp.bytes().await.unwrap_or(Default::default())
-        // );
-        // resp.json().await.map_err(|e| anyhow!(e))
+        Ok(resp)
     }
 }
 

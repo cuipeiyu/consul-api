@@ -5,14 +5,16 @@ use reqwest::{
     header::{HeaderMap, HeaderValue, AUTHORIZATION},
     Method, Response, StatusCode,
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-mod structs;
 
 pub use reqwest::header;
 pub use reqwest::Proxy;
-pub use structs::*;
+
+#[cfg(all(feature = "v1", feature = "v1_20_1"))]
+mod structs_1_20_1;
+#[cfg(all(feature = "v1", feature = "v1_20_1"))]
+pub use structs_1_20_1::*;
 
 pub struct Config {
     pub token: String,
@@ -361,10 +363,10 @@ impl Client {
     /// This endpoint returns all checks that are registered with the local agent.
     /// These checks were either provided through configuration files or added
     /// dynamically using the HTTP API.
-    pub async fn checks(
+    pub async fn agent_checks(
         &self,
         q: &FilterRequestQuery,
-    ) -> Result<HashMap<String, structs::HealthCheck>> {
+    ) -> Result<HashMap<String, HealthCheck>> {
         let resp = self
             .execute_request(Method::GET, "/agent/checks", q, None, &())
             .await?;
@@ -376,29 +378,29 @@ impl Client {
     /// This endpoint adds a new check to the local agent. Checks may be of script,
     /// HTTP, TCP, UDP, or TTL type. The agent is responsible for managing the
     /// status of the check and keeping the Catalog in sync.
-    pub async fn check_register(&self, b: &structs::CheckDefinition) -> Result<()> {
+    pub async fn agent_check_register(&self, b: &CheckDefinition) -> Result<bool> {
         let resp = self
             .execute_request(Method::PUT, "/agent/check/register", &(), None, b)
             .await?;
-        resp.json().await.map_err(|e| anyhow!(e))
+        Ok(resp.status() == StatusCode::OK)
     }
 
     /// Deregister Check
     /// This endpoint remove a check from the local agent. The agent will take care of
     /// deregistering the check from the catalog. If the check with the provided ID
     /// does not exist, no action is taken.
-    pub async fn deregister_check(&self, q: &DeregisterCheckRequestQuery) -> Result<()> {
+    pub async fn agent_deregister_check(&self, q: &DeregisterCheckRequestQuery) -> Result<bool> {
         let path = format!("/agent/check/deregister/{}", q.check_id);
         let resp = self
             .execute_request(Method::PUT, &path, q, None, &())
             .await?;
-        resp.json().await.map_err(|e| anyhow!(e))
+        Ok(resp.status() == StatusCode::OK)
     }
 
     /// TTL Check Pass
     /// This endpoint is used with a TTL type check to set the status of the check
     /// to passing and to reset the TTL clock.
-    pub async fn check_pass(&self, q: &AgentTTLCheckRequestQuery) -> Result<bool> {
+    pub async fn agent_check_pass(&self, q: &AgentTTLCheckRequestQuery) -> Result<bool> {
         let path = format!("/agent/check/pass/{}", q.check_id);
         let resp = self
             .execute_request(Method::PUT, &path, q, None, &())
@@ -410,7 +412,7 @@ impl Client {
     /// TTL Check Warn
     /// This endpoint is used with a TTL type check to set the status of the check
     /// to warning and to reset the TTL clock.
-    pub async fn check_warn(&self, q: &AgentTTLCheckRequestQuery) -> Result<()> {
+    pub async fn agent_check_warn(&self, q: &AgentTTLCheckRequestQuery) -> Result<()> {
         let path = format!("/agent/check/warn/{}", q.check_id);
         let resp = self
             .execute_request(Method::PUT, &path, q, None, &())
@@ -421,7 +423,7 @@ impl Client {
     /// TTL Check Fail
     /// This endpoint is used with a TTL type check to set the status of the check
     /// to critical and to reset the TTL clock.
-    pub async fn check_fail(&self, q: &AgentTTLCheckRequestQuery) -> Result<bool> {
+    pub async fn agent_check_fail(&self, q: &AgentTTLCheckRequestQuery) -> Result<bool> {
         let path = format!("/agent/check/fail/{}", q.check_id);
         let resp = self
             .execute_request(Method::PUT, &path, q, None, &())
@@ -432,7 +434,7 @@ impl Client {
     /// TTL Check Update
     /// This endpoint is used with a TTL type check to set the status of the check
     /// and to reset the TTL clock.
-    pub async fn check_update(
+    pub async fn agent_check_update(
         &self,
         q: &AgentTTLCheckUpdateRequestQuery,
         b: &AgentTTLCheckUpdateRequestBody,
@@ -446,20 +448,20 @@ impl Client {
     /// This endpoint returns all the services that are registered with the local agent.
     /// These services were either provided through configuration files or added
     /// dynamically using the HTTP API.
-    pub async fn list_services(
+    pub async fn agent_services(
         &self,
         q: &FilterRequestQuery,
-    ) -> Result<HashMap<String, structs::NodeService>> {
+    ) -> Result<HashMap<String, AgentService>> {
         let resp = self
             .execute_request(Method::GET, "/agent/services", q, None, &())
             .await?;
         resp.json().await.map_err(|e| anyhow!(e))
     }
 
-    pub async fn service_configuration(
+    pub async fn agent_service_configuration(
         &self,
         q: &ServiceConfigurationRequestQuery,
-    ) -> Result<structs::NodeService> {
+    ) -> Result<AgentService> {
         let path = format!("/agent/service/{}", q.service_id);
         let resp = self
             .execute_request(Method::GET, &path, q, None, &())
@@ -474,10 +476,10 @@ impl Client {
     /// being the default. In order to get the text format, you can
     /// append ?format=text to the URL or use Mime Content negotiation
     /// by specifying a HTTP Header Accept starting with text/plain.
-    pub async fn local_service_health_by_name(
+    pub async fn agent_get_service_health_by_name(
         &self,
         q: &LocalServiceHealthByNameRequestQuery,
-    ) -> Result<Vec<structs::AgentServiceChecksInfo>> {
+    ) -> Result<Vec<AgentServiceChecksInfo>> {
         let path = format!("/agent/health/service/name/{}", q.service_name);
         let resp = self
             .execute_request(Method::GET, &path, q, None, &())
@@ -488,10 +490,10 @@ impl Client {
     /// Get local service health by ID
     /// Retrieve the health state of a specific service on the local agent
     /// by ID.
-    pub async fn local_service_health_by_id(
+    pub async fn agent_get_service_health_by_id(
         &self,
         q: &LocalServiceHealthByIDRequestQuery,
-    ) -> Result<structs::NodeService> {
+    ) -> Result<AgentServiceChecksInfo> {
         let path = format!("/agent/health/service/id/{}", q.service_id);
         let resp = self
             .execute_request(Method::GET, &path, q, None, &())
@@ -509,7 +511,7 @@ impl Client {
     pub async fn agent_register_service(
         &self,
         q: &RegisterServiceRequestQuery,
-        b: &structs::ServiceDefinition,
+        b: &ServiceDefinition,
     ) -> Result<()> {
         let resp = self
             .execute_request(Method::PUT, "/agent/service/register", q, None, b)
@@ -523,7 +525,7 @@ impl Client {
     ///
     /// The agent will take care of deregistering the service with the catalog.
     /// If there is an associated check, that is also deregistered.
-    pub async fn deregister_service(&self, q: &DeregisterServiceRequestQuery) -> Result<()> {
+    pub async fn agent_deregister_service(&self, q: &DeregisterServiceRequestQuery) -> Result<()> {
         let path = format!("/agent/service/deregister/{}", q.service_id);
         let resp = self
             .execute_request(Method::PUT, &path, q, None, &())
@@ -538,21 +540,21 @@ impl Client {
     /// not be present in DNS or API queries. This API call is idempotent.
     /// Maintenance mode is persistent and will be automatically restored on
     /// agent restart.
-    pub async fn enable_maintenance_mode(
+    pub async fn agent_enable_maintenance_mode(
         &self,
         q: &EnableMaintenanceModeRequestQuery,
-    ) -> Result<structs::NodeService> {
+    ) -> Result<bool> {
         let path = format!("/agent/service/maintenance/{}", q.service_id);
         let resp = self
             .execute_request(Method::PUT, &path, q, None, &())
             .await?;
-        resp.json().await.map_err(|e| anyhow!(e))
+        Ok(resp.status() == StatusCode::OK)
     }
 
-    pub async fn connect_authorize(
+    pub async fn agent_connect_authorize(
         &self,
         q: &ConnectAuthorizeRequestQuery,
-        b: &structs::ConnectAuthorizeRequest,
+        b: &ConnectAuthorizeRequest,
     ) -> Result<ConnectAuthorizeRequestReply> {
         let resp = self
             .execute_request(Method::POST, "/agent/connect/authorize", q, None, b)

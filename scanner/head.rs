@@ -5,23 +5,27 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum MeshGatewayMode {
     /// MeshGatewayModeDefault represents no specific mode and should
     /// be used to indicate that a different layer of the configuration
     /// chain should take precedence
+    #[serde(rename = "")]
     Default,
 
     /// MeshGatewayModeNone represents that the Upstream Connect connections
     /// should be direct and not flow through a mesh gateway.
+    #[serde(rename = "none")]
     None,
 
     /// MeshGatewayModeLocal represents that the Upstream Connect connections
     /// should be made to a mesh gateway in the local datacenter.
+    #[serde(rename = "local")]
     Local,
 
     /// MeshGatewayModeRemote represents that the Upstream Connect connections
     /// should be made to a mesh gateway in a remote datacenter.
+    #[serde(rename = "remote")]
     Remote,
 }
 
@@ -42,19 +46,22 @@ impl ::core::fmt::Display for MeshGatewayMode {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum ProxyMode {
     /// ProxyModeDefault represents no specific mode and should
     /// be used to indicate that a different layer of the configuration
     /// chain should take precedence
+    #[serde(rename = "")]
     Default,
 
     /// ProxyModeTransparent represents that inbound and outbound application
     /// traffic is being captured and redirected through the proxy.
+    #[serde(rename = "transparent")]
     Transparent,
 
     /// ProxyModeDirect represents that the proxy's listeners must be dialed directly
     /// by the local application and other proxies.
+    #[serde(rename = "direct")]
     Direct,
 }
 
@@ -74,11 +81,15 @@ impl ::core::fmt::Display for ProxyMode {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum LogSinkType {
+    #[serde(rename = "")]
     Default,
+    #[serde(rename = "file")]
     File,
+    #[serde(rename = "stderr")]
     StdErr,
+    #[serde(rename = "stdout")]
     StdOut,
 }
 
@@ -99,10 +110,47 @@ impl ::core::fmt::Display for LogSinkType {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub enum Health {
+    /// HealthAny is special, and is used as a wild card,
+    /// not as a specific state.
+    #[serde(rename = "any")]
+    Any,
+    #[serde(rename = "passing")]
+    Passing,
+    #[serde(rename = "warning")]
+    Warning,
+    #[serde(rename = "critical")]
+    Critical,
+    #[serde(rename = "maintenance")]
+    Maintenance,
+}
+
+impl Default for Health {
+    fn default() -> Self {
+        Self::Any
+    }
+}
+
+impl ::core::fmt::Display for Health {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+        match self {
+            Self::Any => write!(f, "any"),
+            Self::Passing => write!(f, "passing"),
+            Self::Warning => write!(f, "warning"),
+            Self::Critical => write!(f, "critical"),
+            Self::Maintenance => write!(f, "maintenance"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum MutualTLSMode {
+    #[serde(rename = "")]
     Default,
+    #[serde(rename = "strict")]
     Strict,
+    #[serde(rename = "permissive")]
     Permissive,
 }
 
@@ -122,10 +170,13 @@ impl ::core::fmt::Display for MutualTLSMode {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum UpstreamDestType {
+    #[serde(rename = "")]
     None,
+    #[serde(rename = "service")]
     Service,
+    #[serde(rename = "prepared_query")]
     PreparedQuery,
 }
 

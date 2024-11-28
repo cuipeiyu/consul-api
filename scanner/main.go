@@ -13,21 +13,89 @@ import (
 	"strings"
 )
 
-var rustFile = strings.Builder{}
-
 //go:embed head.rs
 var headFile string
 
-func init() {
-	rustFile.WriteString(headFile)
-	rustFile.WriteString("\n")
+var allStructs = make([]*rustStruct, 0)
+
+type rustStructField struct {
+	anonymous bool
+	link      *rustStruct
+
+	name     string
+	typ      string
+	cfg      []string
+	comments []string
+}
+
+func (s *rustStructField) String() string {
+	tmp := strings.Builder{}
+
+	if s.anonymous {
+		// 搬运匿名结构体内的所有字段
+		for _, line := range s.link.fields {
+			tmp.WriteString(line.String())
+		}
+	} else {
+		for _, line := range s.comments {
+			if line == "" {
+				tmp.WriteString("    ///\n")
+			} else {
+				tmp.WriteString("    /// " + line + "\n")
+			}
+		}
+		for _, line := range s.cfg {
+			tmp.WriteString("    " + line + "\n")
+		}
+
+		tmp.WriteString("    pub " + s.name + ": " + s.typ + ",\n")
+	}
+	return tmp.String() + "\n"
+}
+
+type rustStruct struct {
+	name     string
+	derive   string
+	comments []string
+	fields   []*rustStructField
+	extra    string
+}
+
+func (s *rustStruct) String() string {
+	tmp := strings.Builder{}
+
+	for i, line := range s.comments {
+		if line == "" {
+			if i > 0 {
+				tmp.WriteString("///\n")
+			}
+		} else {
+			tmp.WriteString("/// " + line + "\n")
+		}
+	}
+
+	tmp.WriteString(s.derive + "\n")
+	tmp.WriteString("pub struct " + s.name + " {\n")
+
+	for _, line := range s.fields {
+		tmp.WriteString(line.String())
+	}
+
+	tmp.WriteString("}\n")
+
+	if s.extra != "" {
+		tmp.WriteString("\n" + s.extra + "\n")
+	}
+
+	return tmp.String() + "\n"
 }
 
 func main() {
 	workspace := filepath.Dir(getGoEnv("GOMOD"))
-	outputFilename := filepath.Join(workspace, "..", "src", "structs.rs")
 
-	consulPath := filepath.Join(workspace, "..", "consul")
+	consulPath := filepath.Join(workspace, "..", "consul-1.20.1")
+	outputFilename := filepath.Join(workspace, "..", "src", "structs_1_20_1.rs")
+
 	apiPath := filepath.Join(consulPath, "api")
 	structsPath := filepath.Join(consulPath, "agent", "structs")
 
@@ -45,15 +113,15 @@ func main() {
 		"AgentServiceConnect",
 		"AgentServiceRegistration",
 		"AgentServiceCheck",
+		"QueryOptions",
 	}
 	walkDir(apiPath, picks)
 
 	picks = []string{
-		// "HealthCheck",
+		// "RaftIndex",
 		"HealthCheckDefinition",
 		"CheckDefinition",
-		"RaftIndex",
-		"NodeService",
+		// "NodeService",
 		"ServiceKind",
 		"ServiceAddress",
 		"Weights",
@@ -73,9 +141,33 @@ func main() {
 		"ExposeConfig",
 		"ConnectAuthorizeRequest",
 		"WriteRequest",
-		"QueryOptions",
 	}
 	walkDir(structsPath, picks)
+
+	// 处理关联 anonymous 结构体
+	for _, structItem := range allStructs {
+		for _, fieldItem := range structItem.fields {
+			if fieldItem.anonymous {
+			a:
+				for _, lookup := range allStructs {
+					if lookup.name == fieldItem.name {
+						// println("关联结构体", lookup.name, fieldItem.name)
+						// 关联
+						fieldItem.link = lookup
+						break a
+					}
+				}
+			}
+		}
+	}
+
+	rustFile := strings.Builder{}
+	rustFile.WriteString(headFile)
+	rustFile.WriteString("\n")
+
+	for _, structItem := range allStructs {
+		rustFile.WriteString(structItem.String())
+	}
 
 	// 写入文件
 	err := os.WriteFile(outputFilename, []byte(rustFile.String()), os.ModePerm)
@@ -101,7 +193,7 @@ func parseGoFile(path string, picks []string) {
 		}
 
 		structComment := strings.TrimSpace(gd.Doc.Text())
-		structComment = strings.ReplaceAll(structComment, "\n", "\n/// ")
+		structComments := strings.Split(structComment, "\n")
 
 		for _, spec := range gd.Specs {
 			typeSpec, ok := spec.(*ast.TypeSpec)
@@ -115,24 +207,22 @@ func parseGoFile(path string, picks []string) {
 				continue
 			}
 
+			structName := typeSpec.Name.Name
+
 			// 检查是否为需要提取的结构体
-			if !contains(picks, typeSpec.Name.Name) {
+			if !contains(picks, structName) {
 				continue
 			}
 
-			// if structSkip(typeSpec.Name.Name) {
-			// 	continue
-			// }
-
-			if structComment != "" {
-				rustFile.WriteString(fmt.Sprintf("/// %s\n", structComment))
+			structTemp := rustStruct{
+				name:     structName,
+				derive:   structDerive(structName),
+				comments: structComments,
+				fields:   make([]*rustStructField, 0),
+				extra:    structExtra(structName),
 			}
 
-			// 输出结构体的名称和注释
-			fmt.Printf("Struct Name: %s\n", typeSpec.Name.Name)
-			rustFile.WriteString(structDerive(typeSpec.Name.Name))
-			rustFile.WriteString(fmt.Sprintf("pub struct %s {\n", typeSpec.Name.Name))
-
+		a:
 			// 遍历结构体的字段
 			for _, field := range structType.Fields.List {
 				fieldName := ""
@@ -140,26 +230,27 @@ func parseGoFile(path string, picks []string) {
 				fieldRustType := ""
 				fieldTag := ""
 				fieldComment := ""
+				fieldComments := []string{}
 				fieldVec := 0
 				fieldOptional := false
-
-				// 提取字段注释
-				if field.Doc != nil {
-					fieldComment = strings.TrimSpace(field.Doc.Text())
-					fieldComment = strings.ReplaceAll(fieldComment, "\n", "\n    /// ")
-				}
 
 				// 提取字段标签
 				if field.Tag != nil {
 					fieldTag = field.Tag.Value
 
+					if strings.Contains(fieldTag, "json:\"-\"") {
+						continue a
+					}
+
 					if strings.Contains(fieldTag, "omitempty") {
 						fieldOptional = true
 					}
+				}
 
-					if strings.Contains(fieldTag, "json:\"-\"") {
-						continue
-					}
+				// 提取字段注释
+				if field.Doc != nil {
+					fieldComment = strings.TrimSpace(field.Doc.Text())
+					fieldComments = strings.Split(fieldComment, "\n")
 				}
 
 				// 提取字段类型
@@ -167,16 +258,13 @@ func parseGoFile(path string, picks []string) {
 					se := unwrapSelectorExpr(field.Type)
 					if se != nil {
 						if isDuration(se) {
+							fieldOptional = true
 							fieldType = "time.Duration"
 						} else if isTime(se) {
+							fieldOptional = true
 							fieldType = "time.Time"
 						} else {
 							fieldType = se.Sel.Name
-							// if e, ok := field.Type.(*ast.Ident); ok {
-							// 	// fmt.Printf("B %s\n", e.Name)
-							// 	fieldType = e.Name
-							// }
-							// println("\tNot support this type: ", fieldType)
 						}
 					} else {
 						vec, val := parseType(field.Type)
@@ -184,22 +272,7 @@ func parseGoFile(path string, picks []string) {
 							fieldVec += vec
 						}
 						fieldType = val
-						// fieldType = "*************************"
-
-						// fmt.Printf("%v\n============================\n", fieldType)
-						// fieldType = strings.Split(fieldType, " ")[0]
 					}
-
-					// for {
-					// 	if l, found := strings.CutPrefix(fieldType, "[]"); found {
-					// 		fieldType = l
-					// 		fieldVec += 1
-					// 		fieldType = strings.TrimPrefix(fieldType, "[]")
-					// 		continue
-					// 	}
-
-					// 	break
-					// }
 
 					fieldRustType = toRustType(fieldType)
 				}
@@ -207,34 +280,37 @@ func parseGoFile(path string, picks []string) {
 				// 提取字段名称
 				if field.Names != nil {
 					fieldName = strings.TrimSpace(field.Names[0].Name)
+					if fieldSkip(structName, fieldName) {
+						continue a
+					}
 				} else {
-					fieldName = fieldType
+					if fieldSkip(structName, fieldType) {
+						continue a
+					}
+					// 匿名字段
+					structTemp.fields = append(structTemp.fields, &rustStructField{
+						anonymous: true,
+						name:      fieldType,
+					})
+					continue a
 				}
 
-				if fieldSkip(typeSpec.Name.Name, fieldName) {
-					continue
+				fieldTmp := rustStructField{}
+
+				if fieldName == "AggregatedStatus" {
+					fieldRustType = "Health"
 				}
 
-				if fieldComment == "" {
-					// rustFile.WriteString(fmt.Sprintf("  /// %s\n", fieldName))
-				} else {
-					rustFile.WriteString(fmt.Sprintf("    /// %s\n", fieldComment))
-				}
-
-				if fieldName == "Port" {
+				if strings.Contains(fieldName, "Port") {
 					fieldRustType = "u16"
-				}
-
-				if fieldRustType == "ServiceDefinition" {
+				} else if fieldRustType == "ServiceDefinition" {
 					fieldRustType = "Box<ServiceDefinition>"
-				}
-
-				if fieldRustType == "ServiceConnect" {
+				} else if fieldRustType == "ServiceConnect" {
 					fieldRustType = "Box<ServiceConnect>"
-				}
-
-				if fieldRustType == "AgentServiceRegistration" {
+				} else if fieldRustType == "AgentServiceRegistration" {
 					fieldRustType = "Box<AgentServiceRegistration>"
+				} else if fieldRustType == "HealthCheckDefinition" {
+					fieldOptional = true
 				}
 
 				if fieldType == "QueryMeta" || fieldType == "QueryOptions" || fieldType == "WriteRequest" {
@@ -243,17 +319,17 @@ func parseGoFile(path string, picks []string) {
 
 				if fieldType == "EnterpriseMeta" {
 					fieldOptional = true
-					rustFile.WriteString("    #[cfg(feature = \"enterprise\")]\n")
+					fieldTmp.cfg = append(fieldTmp.cfg, "#[cfg(feature = \"enterprise\")]")
 				}
 
-				rustFile.WriteString(fmt.Sprintf("    #[serde(rename = \"%s\")]\n", fieldName))
+				fieldTmp.cfg = append(fieldTmp.cfg, fmt.Sprintf("#[serde(rename = \"%s\")]", fieldName))
 
 				typename := fieldRustType
 				for i := 0; i < fieldVec; i++ {
 					typename = fmt.Sprintf("Vec<%s>", typename)
 				}
 				if fieldOptional {
-					rustFile.WriteString("    #[serde(skip_serializing_if = \"Option::is_none\")]\n")
+					fieldTmp.cfg = append(fieldTmp.cfg, "#[serde(skip_serializing_if = \"Option::is_none\")]")
 					typename = fmt.Sprintf("Option<%s>", typename)
 				}
 				name := toSnake(fieldName)
@@ -264,17 +340,15 @@ func parseGoFile(path string, picks []string) {
 				} else if name == "override" {
 					name = "r#override"
 				}
-				rustFile.WriteString(fmt.Sprintf("    pub %s: %s,\n\n", name, typename))
+
+				fieldTmp.name = name
+				fieldTmp.comments = fieldComments
+				fieldTmp.typ = typename
+
+				structTemp.fields = append(structTemp.fields, &fieldTmp)
 			}
 
-			// end of struct
-			rustFile.WriteString("}\n\n")
-
-			// struct extra
-			extraBody := structExtra(typeSpec.Name.Name)
-			if extraBody != "" {
-				rustFile.WriteString(extraBody)
-			}
+			allStructs = append(allStructs, &structTemp)
 		}
 		return true
 	})
@@ -308,21 +382,24 @@ func parseType(t ast.Expr) (int, string) {
 		}
 		return vec, fmt.Sprintf(
 			"::std::collections::HashMap<%s, %s>",
-			toRustType(fmt.Sprintf("%s", e.Key)),
-			toRustType(val),
+			toRustType(fmt.Sprintf("%s", e.Key)), toRustType(val),
 		)
 	}
 	return 0, ""
 }
 
 func fieldSkip(structName, fieldName string) bool {
+	// 小写开头则跳过
+	if fieldName[0] >= 'a' && fieldName[0] <= 'z' {
+		return true
+	}
 	if fieldName == "EnterpriseMeta" {
 		return true
 	}
 	switch structName {
 	default:
 		return false
-	case "ServiceDefinition":
+	case "ServiceDefinition", "AgentService":
 		switch fieldName {
 		default:
 			return false
@@ -364,9 +441,9 @@ func fieldSkip(structName, fieldName string) bool {
 func structDerive(name string) string {
 	switch name {
 	default:
-		return "#[derive(Debug, Clone, Default, Serialize, Deserialize)]\n"
+		return "#[derive(Debug, Clone, Default, Serialize, Deserialize)]"
 	case "Weights":
-		return "#[derive(Debug, Clone, Serialize, Deserialize)]\n"
+		return "#[derive(Debug, Clone, Serialize, Deserialize)]"
 	}
 }
 
@@ -386,37 +463,37 @@ impl Default for Weights {
             warning: 1,
         }
     }
-}` + "\n\n"
+}` + "\n"
 	case "HealthCheck":
-		return "pub type HealthChecks = Vec<HealthCheck>;\n\n"
+		return "pub type HealthChecks = Vec<HealthCheck>;\n"
 	case "AgentServiceCheck":
-		return "pub type AgentServiceChecks = Vec<AgentServiceCheck>;\n\n"
+		return "pub type AgentServiceChecks = Vec<AgentServiceCheck>;\n"
 	case "CheckType":
-		return "pub type CheckTypes = Vec<CheckType>;\n\n"
+		return "pub type CheckTypes = Vec<CheckType>;\n"
 	case "Upstream":
-		return "pub type Upstreams = Vec<Upstream>;\n\n"
+		return "pub type Upstreams = Vec<Upstream>;\n"
 	case "ACLServiceIdentity":
-		return "pub type ACLServiceIdentities = Vec<ACLServiceIdentity>;\n\n"
+		return "pub type ACLServiceIdentities = Vec<ACLServiceIdentity>;\n"
 	case "ACLNodeIdentity":
-		return "pub type ACLNodeIdentities = Vec<ACLNodeIdentity>;\n\n"
+		return "pub type ACLNodeIdentities = Vec<ACLNodeIdentity>;\n"
 	case "ACLTemplatedPolicy":
-		return "pub type ACLTemplatedPolicies = Vec<ACLTemplatedPolicy>;\n\n"
+		return "pub type ACLTemplatedPolicies = Vec<ACLTemplatedPolicy>;\n"
 	case "ACLTokenListStub":
-		return "pub type ACLTokenListStubs = Vec<ACLTokenListStub>;\n\n"
+		return "pub type ACLTokenListStubs = Vec<ACLTokenListStub>;\n"
 	case "ACLPolicyListStub":
-		return "pub type ACLPolicyListStubs = Vec<ACLPolicyListStub>;\n\n"
+		return "pub type ACLPolicyListStubs = Vec<ACLPolicyListStub>;\n"
 	case "ACLAuthMethod":
-		return "pub type ACLAuthMethods = Vec<ACLAuthMethod>;\n\n"
+		return "pub type ACLAuthMethods = Vec<ACLAuthMethod>;\n"
 	case "ACLAuthMethodListStub":
-		return "pub type ACLAuthMethodListStubs = Vec<ACLAuthMethodListStub>;\n\n"
+		return "pub type ACLAuthMethodListStubs = Vec<ACLAuthMethodListStub>;\n"
 	case "ACLBindingRule":
-		return "pub type ACLBindingRules = Vec<ACLBindingRule>;\n\n"
+		return "pub type ACLBindingRules = Vec<ACLBindingRule>;\n"
 	case "ACLRole":
-		return "pub type ACLRoles = Vec<ACLRole>;\n\n"
+		return "pub type ACLRoles = Vec<ACLRole>;\n"
 	case "ACLToken":
-		return "pub type ACLTokens = Vec<ACLToken>;\n\n"
+		return "pub type ACLTokens = Vec<ACLToken>;\n"
 	case "ACLPolicy":
-		return "pub type ACLPolicies = Vec<ACLPolicy>;\n\n"
+		return "pub type ACLPolicies = Vec<ACLPolicy>;\n"
 	}
 }
 
@@ -425,9 +502,9 @@ func toRustType(name string) string {
 	default:
 		return name
 	case "time.Duration":
-		return "Option<String>"
+		return "String"
 	case "time.Time":
-		return "Option<String>"
+		return "String"
 	case "string", "CheckID", "ServiceKind":
 		return "String"
 	case "int":
@@ -455,23 +532,6 @@ func toRustType(name string) string {
 	}
 }
 
-// func extractFromPath(path string) {
-// buf, err := os.ReadFile(path)
-// if err != nil {
-// 	return
-// }
-
-// structs, err := extractStructs(buf)
-// if err != nil {
-// 	println(err)
-// 	return
-// }
-
-// for _, item := range structs {
-// rustFile += item.String()
-// }
-// }
-
 func walkDir(path string, picks []string) {
 	if err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -495,17 +555,6 @@ func walkDir(path string, picks []string) {
 		return
 	}
 }
-
-// func extractStructs(buf []byte) ([]*parsedStruct, error) {
-// 	fset := token.NewFileSet()
-// 	file, err := parser.ParseFile(fset, "", buf, parser.ParseComments)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	extractor := &extractor{buffer: buf, structs: []*parsedStruct{}}
-// 	ast.Walk(extractor, file)
-// 	return extractor.structs, nil
-// }
 
 var goEnvCache = ""
 
@@ -531,15 +580,6 @@ func toSnake(camel string) string {
 	snake = matchAllCap.ReplaceAllString(snake, "${1}_${2}")    //拆分单词
 	return strings.ToLower(snake)                               //全部转小写
 }
-
-// here is the test
-// func testToSnake(t *testing.T) {
-// 	input := "MyLIFEIsAwesomE"
-// 	want := "my_life_is_awesom_e"
-// 	if got := toSnake(input); got != want {
-// 		t.Errorf("ToSnake(%v) = %v, want %v", input, got, want)
-// 	}
-// }
 
 func isTime(se *ast.SelectorExpr) bool {
 	if se.Sel.Name != "Time" {

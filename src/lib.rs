@@ -348,6 +348,7 @@ pub struct KVDeleteKeyRequestQuery {
     pub partition: Option<String>,
 }
 
+/// The Consul API client.
 pub struct Client {
     cfg: Config,
     http: reqwest::Client,
@@ -355,6 +356,7 @@ pub struct Client {
 }
 
 impl Client {
+    /// Creates a new client with the default configuration.
     pub fn new() -> Self {
         ClientBuilder::new(Config::default()).build().unwrap()
     }
@@ -389,7 +391,7 @@ impl Client {
     /// This endpoint remove a check from the local agent. The agent will take care of
     /// deregistering the check from the catalog. If the check with the provided ID
     /// does not exist, no action is taken.
-    pub async fn agent_deregister_check(&self, q: &DeregisterCheckRequestQuery) -> Result<bool> {
+    pub async fn agent_check_deregister(&self, q: &DeregisterCheckRequestQuery) -> Result<bool> {
         let path = format!("/agent/check/deregister/{}", q.check_id);
         let resp = self
             .execute_request(Method::PUT, &path, q, None, &())
@@ -642,4 +644,14 @@ impl Client {
 #[inline]
 fn read_env_or_default(key: &str, default: &str) -> String {
     std::env::var(key).unwrap_or_else(|_| default.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn create_client() {
+        let _ = Client::new();
+    }
 }

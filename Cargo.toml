@@ -10,7 +10,7 @@ description = "consul api for rust"
 homepage = "https://github.com/cuipeiyu/consul-api"
 repository = "https://github.com/cuipeiyu/consul-api"
 documentation = "https://docs.rs/consul_api"
-categories = ["sdk"]
+categories = ["api-bindings"]
 keywords = ["consul"]
 readme = "README.md"
 

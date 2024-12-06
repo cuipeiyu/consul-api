@@ -3,6 +3,7 @@
 // Manual changes may cause issues with the program's operation.
 // If modifications are needed, please do so through the program's logic.
 
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -46,40 +47,41 @@ impl ::core::fmt::Display for MeshGatewayMode {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub enum ProxyMode {
-    /// ProxyModeDefault represents no specific mode and should
-    /// be used to indicate that a different layer of the configuration
-    /// chain should take precedence
-    #[serde(rename = "")]
-    Default,
+// TODO 不清楚为何会返回 “Default”，但又不在定义中，所以暂时用字符串代替这个定义
+// #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+// pub enum ProxyMode {
+//     /// ProxyModeDefault represents no specific mode and should
+//     /// be used to indicate that a different layer of the configuration
+//     /// chain should take precedence
+//     #[serde(rename = "")]
+//     Default,
 
-    /// ProxyModeTransparent represents that inbound and outbound application
-    /// traffic is being captured and redirected through the proxy.
-    #[serde(rename = "transparent")]
-    Transparent,
+//     /// ProxyModeTransparent represents that inbound and outbound application
+//     /// traffic is being captured and redirected through the proxy.
+//     #[serde(rename = "transparent")]
+//     Transparent,
 
-    /// ProxyModeDirect represents that the proxy's listeners must be dialed directly
-    /// by the local application and other proxies.
-    #[serde(rename = "direct")]
-    Direct,
-}
+//     /// ProxyModeDirect represents that the proxy's listeners must be dialed directly
+//     /// by the local application and other proxies.
+//     #[serde(rename = "direct")]
+//     Direct,
+// }
 
-impl Default for ProxyMode {
-    fn default() -> Self {
-        Self::Default
-    }
-}
+// impl Default for ProxyMode {
+//     fn default() -> Self {
+//         Self::Default
+//     }
+// }
 
-impl ::core::fmt::Display for ProxyMode {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-        match self {
-            Self::Default => write!(f, ""),
-            Self::Transparent => write!(f, "transparent"),
-            Self::Direct => write!(f, "direct"),
-        }
-    }
-}
+// impl ::core::fmt::Display for ProxyMode {
+//     fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+//         match self {
+//             Self::Default => write!(f, ""),
+//             Self::Transparent => write!(f, "transparent"),
+//             Self::Direct => write!(f, "direct"),
+//         }
+//     }
+// }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum LogSinkType {
@@ -145,53 +147,36 @@ impl ::core::fmt::Display for Health {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub enum MutualTLSMode {
+pub enum GatewayServiceKind {
     #[serde(rename = "")]
-    Default,
-    #[serde(rename = "strict")]
-    Strict,
-    #[serde(rename = "permissive")]
-    Permissive,
-}
-
-impl Default for MutualTLSMode {
-    fn default() -> Self {
-        Self::Default
-    }
-}
-
-impl ::core::fmt::Display for MutualTLSMode {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-        match self {
-            Self::Default => write!(f, ""),
-            Self::Strict => write!(f, "strict"),
-            Self::Permissive => write!(f, "permissive"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub enum UpstreamDestType {
-    #[serde(rename = "")]
-    None,
+    Unknown,
+    #[serde(rename = "destination")]
+    Destination,
     #[serde(rename = "service")]
     Service,
-    #[serde(rename = "prepared_query")]
-    PreparedQuery,
 }
 
-impl Default for UpstreamDestType {
+impl Default for GatewayServiceKind {
     fn default() -> Self {
-        Self::None
+        Self::Unknown
     }
 }
 
-impl ::core::fmt::Display for UpstreamDestType {
+impl ::core::fmt::Display for GatewayServiceKind {
     fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
         match self {
-            Self::None => write!(f, ""),
+            Self::Unknown => write!(f, ""),
+            Self::Destination => write!(f, "destination"),
             Self::Service => write!(f, "service"),
-            Self::PreparedQuery => write!(f, "prepared_query"),
         }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Base64Payload(pub(crate) String);
+
+impl Base64Payload {
+    pub fn to_vec(&self) -> Vec<u8> {
+        STANDARD.decode(&self.0).unwrap()
     }
 }

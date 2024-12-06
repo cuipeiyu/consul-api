@@ -3,6 +3,7 @@
 // Manual changes may cause issues with the program's operation.
 // If modifications are needed, please do so through the program's logic.
 
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -46,40 +47,41 @@ impl ::core::fmt::Display for MeshGatewayMode {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub enum ProxyMode {
-    /// ProxyModeDefault represents no specific mode and should
-    /// be used to indicate that a different layer of the configuration
-    /// chain should take precedence
-    #[serde(rename = "")]
-    Default,
+// TODO 不清楚为何会返回 “Default”，但又不在定义中，所以暂时用字符串代替这个定义
+// #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+// pub enum ProxyMode {
+//     /// ProxyModeDefault represents no specific mode and should
+//     /// be used to indicate that a different layer of the configuration
+//     /// chain should take precedence
+//     #[serde(rename = "")]
+//     Default,
 
-    /// ProxyModeTransparent represents that inbound and outbound application
-    /// traffic is being captured and redirected through the proxy.
-    #[serde(rename = "transparent")]
-    Transparent,
+//     /// ProxyModeTransparent represents that inbound and outbound application
+//     /// traffic is being captured and redirected through the proxy.
+//     #[serde(rename = "transparent")]
+//     Transparent,
 
-    /// ProxyModeDirect represents that the proxy's listeners must be dialed directly
-    /// by the local application and other proxies.
-    #[serde(rename = "direct")]
-    Direct,
-}
+//     /// ProxyModeDirect represents that the proxy's listeners must be dialed directly
+//     /// by the local application and other proxies.
+//     #[serde(rename = "direct")]
+//     Direct,
+// }
 
-impl Default for ProxyMode {
-    fn default() -> Self {
-        Self::Default
-    }
-}
+// impl Default for ProxyMode {
+//     fn default() -> Self {
+//         Self::Default
+//     }
+// }
 
-impl ::core::fmt::Display for ProxyMode {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-        match self {
-            Self::Default => write!(f, ""),
-            Self::Transparent => write!(f, "transparent"),
-            Self::Direct => write!(f, "direct"),
-        }
-    }
-}
+// impl ::core::fmt::Display for ProxyMode {
+//     fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+//         match self {
+//             Self::Default => write!(f, ""),
+//             Self::Transparent => write!(f, "transparent"),
+//             Self::Direct => write!(f, "direct"),
+//         }
+//     }
+// }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum LogSinkType {
@@ -145,55 +147,48 @@ impl ::core::fmt::Display for Health {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub enum MutualTLSMode {
+pub enum GatewayServiceKind {
     #[serde(rename = "")]
-    Default,
-    #[serde(rename = "strict")]
-    Strict,
-    #[serde(rename = "permissive")]
-    Permissive,
-}
-
-impl Default for MutualTLSMode {
-    fn default() -> Self {
-        Self::Default
-    }
-}
-
-impl ::core::fmt::Display for MutualTLSMode {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-        match self {
-            Self::Default => write!(f, ""),
-            Self::Strict => write!(f, "strict"),
-            Self::Permissive => write!(f, "permissive"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub enum UpstreamDestType {
-    #[serde(rename = "")]
-    None,
+    Unknown,
+    #[serde(rename = "destination")]
+    Destination,
     #[serde(rename = "service")]
     Service,
-    #[serde(rename = "prepared_query")]
-    PreparedQuery,
 }
 
-impl Default for UpstreamDestType {
+impl Default for GatewayServiceKind {
     fn default() -> Self {
-        Self::None
+        Self::Unknown
     }
 }
 
-impl ::core::fmt::Display for UpstreamDestType {
+impl ::core::fmt::Display for GatewayServiceKind {
     fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
         match self {
-            Self::None => write!(f, ""),
+            Self::Unknown => write!(f, ""),
+            Self::Destination => write!(f, "destination"),
             Self::Service => write!(f, "service"),
-            Self::PreparedQuery => write!(f, "prepared_query"),
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Base64Payload(pub(crate) String);
+
+impl Base64Payload {
+    pub fn to_vec(&self) -> Vec<u8> {
+        STANDARD.decode(&self.0).unwrap()
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ACLLink {
+    #[serde(rename = "ID")]
+    pub id: String,
+
+    #[serde(rename = "Name")]
+    pub name: String,
+
 }
 
 /// AgentWeights represent optional weights for a service
@@ -262,10 +257,6 @@ pub struct AgentService {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub connect: Option<AgentServiceConnect>,
 
-    #[serde(rename = "PeerName")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub peer_name: Option<String>,
-
     /// NOTE: If we ever set the ContentHash outside of singular service lookup then we may need
     /// to include the Namespace in the hash. When we do, then we are in for lots of fun with tests.
     /// For now though, ignoring it works well enough.
@@ -282,6 +273,7 @@ pub struct AgentService {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub datacenter: Option<String>,
 
+    #[cfg(feature = "enterprise")]
     #[serde(rename = "Locality")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub locality: Option<Locality>,
@@ -345,7 +337,7 @@ pub struct AgentServiceConnectProxyConfig {
 
     #[serde(rename = "Mode")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub mode: Option<ProxyMode>,
+    pub mode: Option<String>,
 
     #[serde(rename = "TransparentProxy")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -438,6 +430,7 @@ pub struct AgentServiceRegistration {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub partition: Option<String>,
 
+    #[cfg(feature = "enterprise")]
     #[serde(rename = "Locality")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub locality: Option<Locality>,
@@ -756,10 +749,6 @@ pub struct HealthCheck {
     #[serde(rename = "ExposedPort")]
     pub exposed_port: u16,
 
-    #[serde(rename = "PeerName")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub peer_name: Option<String>,
-
     #[serde(rename = "Definition")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub definition: Option<HealthCheckDefinition>,
@@ -774,6 +763,63 @@ pub struct HealthCheck {
 
 pub type HealthChecks = Vec<HealthCheck>;
 
+
+/// NamespaceACLConfig is the Namespace specific ACL configuration container
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NamespaceACLConfig {
+    /// PolicyDefaults is the list of policies that should be used for the parent authorizer
+    /// of all tokens in the associated namespace.
+    #[serde(rename = "PolicyDefaults")]
+    pub policy_defaults: Vec<ACLLink>,
+
+    /// RoleDefaults is the list of roles that should be used for the parent authorizer
+    /// of all tokens in the associated namespace.
+    #[serde(rename = "RoleDefaults")]
+    pub role_defaults: Vec<ACLLink>,
+
+}
+
+/// UserEventParam is used to parameterize a user event
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct UserEvent {
+    /// ID of the user event. Automatically generated.
+    #[serde(rename = "ID")]
+    pub id: String,
+
+    /// Name of the event
+    #[serde(rename = "Name")]
+    pub name: String,
+
+    /// Optional payload
+    #[serde(rename = "Payload")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payload: Option<Base64Payload>,
+
+    /// NodeFilter is a regular expression to filter on nodes
+    #[serde(rename = "NodeFilter")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node_filter: Option<String>,
+
+    /// ServiceFilter is a regular expression to filter on services
+    #[serde(rename = "ServiceFilter")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_filter: Option<String>,
+
+    /// TagFilter is a regular expression to filter on tags of a service,
+    /// must be provided with ServiceFilter
+    #[serde(rename = "TagFilter")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tag_filter: Option<String>,
+
+    /// Version of the user event. Automatically generated.
+    #[serde(rename = "Version")]
+    pub version: isize,
+
+    /// LTime is the lamport time. Automatically generated.
+    #[serde(rename = "LTime")]
+    pub l_time: u64,
+
+}
 
 /// CheckDefinition is used to JSON decode the Check definitions
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -1014,6 +1060,60 @@ pub struct CheckType {
 pub type CheckTypes = Vec<CheckType>;
 
 
+/// GatewayService is used to associate gateways with their linked services.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct GatewayService {
+    #[serde(rename = "Gateway")]
+    pub gateway: ServiceName,
+
+    #[serde(rename = "Service")]
+    pub service: ServiceName,
+
+    #[serde(rename = "GatewayKind")]
+    pub gateway_kind: String,
+
+    #[serde(rename = "Port")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub port: Option<u16>,
+
+    #[serde(rename = "Protocol")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub protocol: Option<String>,
+
+    #[serde(rename = "Hosts")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hosts: Option<Vec<String>>,
+
+    #[serde(rename = "CAFile")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ca_file: Option<String>,
+
+    #[serde(rename = "CertFile")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cert_file: Option<String>,
+
+    #[serde(rename = "KeyFile")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub key_file: Option<String>,
+
+    #[serde(rename = "SNI")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sni: Option<String>,
+
+    #[serde(rename = "FromWildcard")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from_wildcard: Option<bool>,
+
+    #[serde(rename = "ServiceKind")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_kind: Option<GatewayServiceKind>,
+
+    #[serde(rename = "AutoHostRewrite")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auto_host_rewrite: Option<bool>,
+
+}
+
 /// ConnectAuthorizeRequest is the structure of a request to authorize
 /// a connection.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -1152,7 +1252,7 @@ pub struct ConnectProxyConfig {
 
     /// Mode represents how the proxy's inbound and upstream listeners are dialed.
     #[serde(rename = "Mode")]
-    pub mode: ProxyMode,
+    pub mode: String,
 
     /// Upstreams describes any upstream dependencies the proxy instance should
     /// setup.
@@ -1365,8 +1465,10 @@ pub struct ServiceDefinition {
     #[serde(rename = "EnableTagOverride")]
     pub enable_tag_override: bool,
 
+    #[cfg(feature = "enterprise")]
     #[serde(rename = "Locality")]
-    pub locality: Locality,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub locality: Option<Locality>,
 
     /// Proxy is the configuration set for Kind = connect-proxy. It is mandatory in
     /// that case and an error to be set for any other kind. This config is part of
@@ -1386,7 +1488,201 @@ pub struct WriteRequest {
     /// Token is the ACL token ID. If not provided, the 'anonymous'
     /// token is assumed for backwards compatibility.
     #[serde(rename = "Token")]
-    pub token: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
+
+}
+
+/// RegisterRequest is used for the Catalog.Register endpoint
+/// to register a node as providing a service. If no service
+/// is provided, the node is registered.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct RegisterRequest {
+    #[serde(rename = "Datacenter")]
+    pub datacenter: String,
+
+    #[serde(rename = "ID")]
+    pub id: String,
+
+    #[serde(rename = "Node")]
+    pub node: String,
+
+    #[serde(rename = "Address")]
+    pub address: String,
+
+    #[serde(rename = "TaggedAddresses")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tagged_addresses: Option<::std::collections::HashMap<String, String>>,
+
+    #[serde(rename = "NodeMeta")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node_meta: Option<::std::collections::HashMap<String, String>>,
+
+    #[serde(rename = "Service")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service: Option<NodeService>,
+
+    #[serde(rename = "Check")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub check: Option<HealthCheck>,
+
+    #[serde(rename = "Checks")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub checks: Option<HealthChecks>,
+
+    #[cfg(feature = "enterprise")]
+    #[serde(rename = "Locality")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub locality: Option<Locality>,
+
+    /// SkipNodeUpdate can be used when a register request is intended for
+    /// updating a service and/or checks, but doesn't want to overwrite any
+    /// node information if the node is already registered. If the node
+    /// doesn't exist, it will still be created, but if the node exists, any
+    /// node portion of this update will not apply.
+    #[serde(rename = "SkipNodeUpdate")]
+    pub skip_node_update: bool,
+
+    /// Token is the ACL token ID. If not provided, the 'anonymous'
+    /// token is assumed for backwards compatibility.
+    #[serde(rename = "Token")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
+
+
+}
+
+/// DeregisterRequest is used for the Catalog.Deregister endpoint to
+/// deregister a service, check, or node (only one should be provided).
+/// If ServiceID or CheckID are not provided, the entire node is deregistered.
+/// If a ServiceID is provided, any associated Checks with that service
+/// are also deregistered.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DeregisterRequest {
+    #[serde(rename = "Datacenter")]
+    pub datacenter: String,
+
+    #[serde(rename = "Node")]
+    pub node: String,
+
+    #[serde(rename = "ServiceID")]
+    pub service_id: String,
+
+    #[serde(rename = "CheckID")]
+    pub check_id: String,
+
+    /// Token is the ACL token ID. If not provided, the 'anonymous'
+    /// token is assumed for backwards compatibility.
+    #[serde(rename = "Token")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
+
+
+}
+
+/// Used to return information about a node
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Node {
+    #[serde(rename = "ID")]
+    pub id: String,
+
+    #[serde(rename = "Node")]
+    pub node: String,
+
+    #[serde(rename = "Address")]
+    pub address: String,
+
+    #[serde(rename = "Datacenter")]
+    pub datacenter: String,
+
+    #[serde(rename = "Partition")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partition: Option<String>,
+
+    #[serde(rename = "TaggedAddresses")]
+    pub tagged_addresses: ::std::collections::HashMap<String, String>,
+
+    #[serde(rename = "Meta")]
+    pub meta: ::std::collections::HashMap<String, String>,
+
+    #[cfg(feature = "enterprise")]
+    #[serde(rename = "Locality")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub locality: Option<Locality>,
+
+}
+
+/// ServiceNode represents a node that is part of a service. ID, Address,
+/// TaggedAddresses, and NodeMeta are node-related fields that are always empty
+/// in the state store and are filled in on the way out by parseServiceNodes().
+/// This is also why PartialClone() skips them, because we know they are blank
+/// already so it would be a waste of time to copy them.
+/// This is somewhat complicated when the address is really a unix domain socket; technically that
+/// will override the address field, but in practice the two use cases should not overlap.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ServiceNode {
+    #[serde(rename = "ID")]
+    pub id: String,
+
+    #[serde(rename = "Node")]
+    pub node: String,
+
+    #[serde(rename = "Address")]
+    pub address: String,
+
+    #[serde(rename = "Datacenter")]
+    pub datacenter: String,
+
+    #[serde(rename = "TaggedAddresses")]
+    pub tagged_addresses: ::std::collections::HashMap<String, String>,
+
+    #[serde(rename = "NodeMeta")]
+    pub node_meta: ::std::collections::HashMap<String, String>,
+
+    #[serde(rename = "ServiceKind")]
+    pub service_kind: String,
+
+    #[serde(rename = "ServiceID")]
+    pub service_id: String,
+
+    #[serde(rename = "ServiceName")]
+    pub service_name: String,
+
+    #[serde(rename = "ServiceTags")]
+    pub service_tags: Vec<String>,
+
+    #[serde(rename = "ServiceAddress")]
+    pub service_address: String,
+
+    #[serde(rename = "ServiceTaggedAddresses")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_tagged_addresses: Option<::std::collections::HashMap<String, ServiceAddress>>,
+
+    #[serde(rename = "ServiceWeights")]
+    pub service_weights: Weights,
+
+    #[serde(rename = "ServiceMeta")]
+    pub service_meta: ::std::collections::HashMap<String, String>,
+
+    #[serde(rename = "ServicePort")]
+    pub service_port: u16,
+
+    #[serde(rename = "ServiceSocketPath")]
+    pub service_socket_path: String,
+
+    #[serde(rename = "ServiceEnableTagOverride")]
+    pub service_enable_tag_override: bool,
+
+    #[serde(rename = "ServiceProxy")]
+    pub service_proxy: ConnectProxyConfig,
+
+    #[serde(rename = "ServiceConnect")]
+    pub service_connect: Box<ServiceConnect>,
+
+    #[cfg(feature = "enterprise")]
+    #[serde(rename = "ServiceLocality")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_locality: Option<Locality>,
 
 }
 
@@ -1422,6 +1718,64 @@ pub struct ServiceAddress {
 
     #[serde(rename = "Port")]
     pub port: u16,
+
+}
+
+/// NodeService is a service provided by a node
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NodeService {
+    #[serde(rename = "ID")]
+    pub id: String,
+
+    #[serde(rename = "Service")]
+    pub service: String,
+
+    #[serde(rename = "Tags")]
+    pub tags: Vec<String>,
+
+    #[serde(rename = "Address")]
+    pub address: String,
+
+    #[serde(rename = "TaggedAddresses")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tagged_addresses: Option<::std::collections::HashMap<String, ServiceAddress>>,
+
+    #[serde(rename = "Meta")]
+    pub meta: ::std::collections::HashMap<String, String>,
+
+    #[serde(rename = "Port")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub port: Option<u16>,
+
+    #[serde(rename = "SocketPath")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub socket_path: Option<String>,
+
+    #[serde(rename = "Weights")]
+    pub weights: Weights,
+
+    #[serde(rename = "EnableTagOverride")]
+    pub enable_tag_override: bool,
+
+    #[cfg(feature = "enterprise")]
+    #[serde(rename = "Locality")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub locality: Option<Locality>,
+
+    /// Proxy is the configuration set for Kind = connect-proxy. It is mandatory in
+    /// that case and an error to be set for any other kind. This config is part of
+    /// a proxy service definition. ProxyConfig may be a more natural name here, but
+    /// it's confusing for the UX because one of the fields in ConnectProxyConfig is
+    /// also called just "Config"
+    #[serde(rename = "Proxy")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proxy: Option<ConnectProxyConfig>,
+
+    /// Connect are the Connect settings for a service. This is purposely NOT
+    /// a pointer so that we never have to nil-check this.
+    #[serde(rename = "Connect")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub connect: Option<Box<ServiceConnect>>,
 
 }
 
@@ -1465,6 +1819,18 @@ pub struct ServiceConnect {
     #[serde(rename = "PeerMeta")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub peer_meta: Option<PeeringServiceMeta>,
+
+}
+
+/// NodeServices represents services provided by Node.
+/// Services is a map of service IDs to services.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NodeServices {
+    #[serde(rename = "Node")]
+    pub node: Node,
+
+    #[serde(rename = "Services")]
+    pub services: ::std::collections::HashMap<String, NodeService>,
 
 }
 
@@ -1569,6 +1935,28 @@ pub struct HealthCheckDefinition {
     #[serde(rename = "TTL")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ttl: Option<String>,
+
+}
+
+/// CheckServiceNode is used to provide the node, its service
+/// definition, as well as a HealthCheck that is associated.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CheckServiceNode {
+    #[serde(rename = "Node")]
+    pub node: Node,
+
+    #[serde(rename = "Service")]
+    pub service: NodeService,
+
+    #[serde(rename = "Checks")]
+    pub checks: HealthChecks,
+
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ServiceName {
+    #[serde(rename = "Name")]
+    pub name: String,
 
 }
 

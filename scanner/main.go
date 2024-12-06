@@ -97,7 +97,8 @@ func main() {
 	outputFilename := filepath.Join(workspace, "..", "src", "structs_1_20_1.rs")
 
 	apiPath := filepath.Join(consulPath, "api")
-	structsPath := filepath.Join(consulPath, "agent", "structs")
+	agentPath := filepath.Join(consulPath, "agent")
+	structsPath := filepath.Join(agentPath, "structs")
 
 	println("workspace: ", workspace)
 	println("consulPath: ", consulPath)
@@ -113,18 +114,32 @@ func main() {
 		"AgentServiceConnect",
 		"AgentServiceRegistration",
 		"AgentServiceCheck",
+		"NamespaceACLConfig",
+		"ACLLink",
 		"QueryOptions",
 	}
 	walkDir(apiPath, picks)
 
 	picks = []string{
-		// "RaftIndex",
+		"UserEvent",
+	}
+	walkDir(agentPath, picks)
+
+	picks = []string{
 		"HealthCheckDefinition",
 		"CheckDefinition",
-		// "NodeService",
+		"NodeService",
+		"RegisterRequest",
+		"DeregisterRequest",
 		"ServiceKind",
 		"ServiceAddress",
+		"ServiceNode",
+		"ServiceName",
+		"GatewayService",
+		"Node",
+		"NodeServices",
 		"Weights",
+		"CheckServiceNode",
 		"Locality",
 		"ConnectProxyConfig",
 		"ServiceConnect",
@@ -148,14 +163,22 @@ func main() {
 	for _, structItem := range allStructs {
 		for _, fieldItem := range structItem.fields {
 			if fieldItem.anonymous {
+				found := false
+
 			a:
 				for _, lookup := range allStructs {
 					if lookup.name == fieldItem.name {
 						// println("关联结构体", lookup.name, fieldItem.name)
 						// 关联
 						fieldItem.link = lookup
+						found = true
 						break a
 					}
+				}
+
+				if !found {
+					println("关联结构体未找到,名称：" + structItem.name + ", 目标：" + fieldItem.name)
+					return
 				}
 			}
 		}
@@ -313,11 +336,36 @@ func parseGoFile(path string, picks []string) {
 					fieldOptional = true
 				}
 
+				if structName == "WriteRequest" && fieldName == "Token" {
+					fieldOptional = true
+				}
+
+				// UserEvent.Payload 虽然是 []byte，但会进行 base64 编码为 string
+				if structName == "UserEvent" && fieldName == "Payload" {
+					fieldOptional = true
+					fieldVec = 0
+					fieldRustType = "Base64Payload"
+				}
+
+				if structName == "RegisterRequest" {
+					switch fieldName {
+					case "TaggedAddresses", "NodeMeta", "Service", "Check", "Checks":
+						fieldOptional = true
+					}
+				}
+
+				if structName == "NodeService" {
+					switch fieldName {
+					case "Proxy", "Connect":
+						fieldOptional = true
+					}
+				}
+
 				if fieldType == "QueryMeta" || fieldType == "QueryOptions" || fieldType == "WriteRequest" {
 					fieldOptional = true
 				}
 
-				if fieldType == "EnterpriseMeta" {
+				if fieldType == "EnterpriseMeta" || fieldType == "Locality" {
 					fieldOptional = true
 					fieldTmp.cfg = append(fieldTmp.cfg, "#[cfg(feature = \"enterprise\")]")
 				}
@@ -396,45 +444,50 @@ func fieldSkip(structName, fieldName string) bool {
 	if fieldName == "EnterpriseMeta" {
 		return true
 	}
+	if fieldName == "RaftIndex" {
+		return true
+	}
+	if fieldName == "PeerName" {
+		return true
+	}
 	switch structName {
-	default:
-		return false
 	case "ServiceDefinition", "AgentService":
 		switch fieldName {
-		default:
-			return false
 		case "Kind":
+			return true
+		}
+	case "NodeService":
+		switch fieldName {
+		case "Kind", "PeerName":
 			return true
 		}
 	case "AgentServiceConnectProxyConfig":
 		switch fieldName {
-		default:
-			return false
 		case "Config":
+			return true
+		}
+	case "RegisterRequest":
+		switch fieldName {
+		case "PeerName":
 			return true
 		}
 	case "ConnectProxyConfig":
 		switch fieldName {
-		default:
-			return false
 		case "Config":
 			return true
 		}
 	case "Upstream":
 		switch fieldName {
-		default:
-			return false
 		case "Config":
 			return true
 		}
 	case "EnvoyExtension":
 		switch fieldName {
-		default:
-			return false
 		case "Arguments":
 			return true
 		}
 	}
+	return false
 }
 
 // 指定 struct derive
@@ -505,7 +558,7 @@ func toRustType(name string) string {
 		return "String"
 	case "time.Time":
 		return "String"
-	case "string", "CheckID", "ServiceKind":
+	case "string", "CheckID", "NodeID", "ServiceKind", "ProxyMode":
 		return "String"
 	case "int":
 		return "isize"

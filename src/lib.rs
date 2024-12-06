@@ -8,12 +8,14 @@ use reqwest::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-pub use reqwest::header;
+// #[doc(hidden)]
+// pub use reqwest::header;
+#[doc(hidden)]
 pub use reqwest::Proxy;
 
-#[cfg(all(feature = "v1", feature = "v1_20_1"))]
+#[cfg(all(feature = "v1", feature = "v1_20_x"))]
 mod structs_1_20_1;
-#[cfg(all(feature = "v1", feature = "v1_20_1"))]
+#[cfg(all(feature = "v1", feature = "v1_20_x"))]
 pub use structs_1_20_1::*;
 
 pub struct Config {
@@ -228,11 +230,7 @@ pub struct ConnectAuthorizeRequestReply {
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
-pub struct KVReadKeyRequestQuery {
-    /// Specifies the path of the key to read.
-    #[serde(skip_serializing)]
-    pub key: String,
-
+pub struct KVReadKeyQuery {
     /// Specifies the datacenter to query. This will default to the
     /// datacenter of the agent being queried.
     pub dc: Option<String>,
@@ -268,11 +266,7 @@ pub struct KVReadKeyRequestQuery {
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
-pub struct KVCreateOrUpdateKeyRequestQuery {
-    /// Specifies the path of the key to create or update.
-    #[serde(skip_serializing)]
-    pub key: String,
-
+pub struct KVCreateOrUpdateKeyQuery {
     /// Specifies the datacenter to query. This will default to the
     /// datacenter of the agent being queried.
     pub dc: Option<String>,
@@ -318,11 +312,7 @@ pub struct KVCreateOrUpdateKeyRequestQuery {
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
-pub struct KVDeleteKeyRequestQuery {
-    /// Specifies the path of the key to delete.
-    #[serde(skip_serializing)]
-    pub key: String,
-
+pub struct KVDeleteKeyQuery {
     /// Specifies the datacenter to query. This will default to the datacenter
     /// of the agent being queried. If the DC is invalid, the error "No path to
     /// datacenter" is returned.
@@ -346,6 +336,298 @@ pub struct KVDeleteKeyRequestQuery {
     #[cfg(feature = "enterprise")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub partition: Option<String>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct CatalogRegisterEntityQuery {
+    #[cfg(feature = "enterprise")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ns: Option<String>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct CatalogDeregisterEntityQuery {
+    #[cfg(feature = "enterprise")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ns: Option<String>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct CatalogListServicesQuery {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dc: Option<String>,
+
+    #[serde(rename = "node-meta")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node_meta: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filter: Option<String>,
+
+    #[cfg(feature = "enterprise")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ns: Option<String>,
+
+    #[cfg(feature = "enterprise")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partition: Option<String>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct CatalogListNodesForServiceQuery {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dc: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tag: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub near: Option<String>,
+
+    #[serde(rename = "node-meta")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node_meta: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filter: Option<String>,
+
+    #[cfg(feature = "enterprise")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ns: Option<String>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct CatalogNodeServicesQuery {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dc: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filter: Option<String>,
+
+    #[cfg(feature = "enterprise")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ns: Option<String>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct CatalogGatewayServicesQuery {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dc: Option<String>,
+
+    #[cfg(feature = "enterprise")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ns: Option<String>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct EventFireQuery {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dc: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tag: Option<String>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct EventListQuery {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tag: Option<String>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct HealthListNodesQuery {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dc: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filter: Option<String>,
+
+    #[cfg(feature = "enterprise")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ns: Option<String>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct HealthListServicesQuery {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dc: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub near: Option<String>,
+
+    #[serde(rename = "node-meta")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node_meta: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filter: Option<String>,
+
+    #[cfg(feature = "enterprise")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ns: Option<String>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct HealthListServiceInstancesQuery {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dc: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub near: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tag: Option<String>,
+
+    #[serde(rename = "node-meta")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node_meta: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub passing: Option<bool>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filter: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub peer: Option<String>,
+
+    #[cfg(feature = "enterprise")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ns: Option<String>,
+
+    #[cfg(feature = "enterprise")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sg: Option<String>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct HealthListStateQuery {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dc: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub near: Option<String>,
+
+    #[serde(rename = "node-meta")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node_meta: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filter: Option<String>,
+
+    #[cfg(feature = "enterprise")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ns: Option<String>,
+}
+
+#[cfg(feature = "enterprise")]
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct NamespaceCreateBody {
+    /// The namespace's name. This field must be a valid DNS hostname label.
+    ///
+    /// required
+    ///
+    #[serde(rename = "Name")]
+    pub name: String,
+
+    /// Free form namespaces description.
+    #[serde(rename = "Description")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+
+    #[serde(rename = "ACLs")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub acls: Option<NamespaceACLConfig>,
+
+    #[serde(rename = "Meta")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<::std::collections::HashMap<String, String>>,
+
+    #[serde(rename = "Partition")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partition: Option<String>,
+}
+
+#[cfg(feature = "enterprise")]
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct NamespaceDetail {
+    /// The namespace's name.
+    #[serde(rename = "Name")]
+    pub name: String,
+
+    /// Free form namespaces description.
+    #[serde(rename = "Description")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+
+    #[serde(rename = "ACLs")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub acls: Option<NamespaceACLConfig>,
+
+    #[serde(rename = "Meta")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<::std::collections::HashMap<String, String>>,
+
+    #[serde(rename = "CreateIndex")]
+    pub create_index: u64,
+
+    #[serde(rename = "ModifyIndex")]
+    pub modify_index: u64,
+}
+
+#[cfg(feature = "enterprise")]
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct NamespaceReadQuery {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partition: Option<String>,
+}
+
+#[cfg(feature = "enterprise")]
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct NamespaceUpdateBody {
+    /// If specified, this field must be an exact match with the name path
+    /// parameter.
+    #[serde(rename = "Name")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+
+    /// Free form namespaces description.
+    #[serde(rename = "Description")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+
+    #[serde(rename = "ACLs")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub acls: Option<NamespaceACLConfig>,
+
+    #[serde(rename = "Meta")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<::std::collections::HashMap<String, String>>,
+
+    #[serde(rename = "Partition")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partition: Option<String>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct StatusQuery {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dc: Option<String>,
 }
 
 /// The Consul API client.
@@ -463,12 +745,17 @@ impl Client {
     pub async fn agent_service_configuration(
         &self,
         q: &ServiceConfigurationRequestQuery,
-    ) -> Result<AgentService> {
+    ) -> Result<Option<AgentService>> {
         let path = format!("/agent/service/{}", q.service_id);
         let resp = self
             .execute_request(Method::GET, &path, q, None, &())
             .await?;
-        resp.json().await.map_err(|e| anyhow!(e))
+
+        if resp.status() == StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+
+        Ok(Some(resp.json().await.map_err(|e| anyhow!(e))?))
     }
 
     /// Get local service health
@@ -495,12 +782,17 @@ impl Client {
     pub async fn agent_get_service_health_by_id(
         &self,
         q: &LocalServiceHealthByIDRequestQuery,
-    ) -> Result<AgentServiceChecksInfo> {
+    ) -> Result<Option<AgentServiceChecksInfo>> {
         let path = format!("/agent/health/service/id/{}", q.service_id);
         let resp = self
             .execute_request(Method::GET, &path, q, None, &())
             .await?;
-        resp.json().await.map_err(|e| anyhow!(e))
+
+        if resp.status() == StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+
+        Ok(Some(resp.json().await.map_err(|e| anyhow!(e))?))
     }
 
     /// Register Service
@@ -564,11 +856,294 @@ impl Client {
         resp.json().await.map_err(|e| anyhow!(e))
     }
 
+    /// Catalog Register Entity
+    /// This endpoint is a low-level mechanism for registering or updating
+    /// entries in the catalog. It is usually preferable to instead use the
+    /// agent endpoints for registration as they are simpler and perform
+    /// anti-entropy.
+    pub async fn catalog_register_entity(
+        &self,
+        q: &CatalogRegisterEntityQuery,
+        b: &RegisterRequest,
+    ) -> Result<bool> {
+        let resp = self
+            .execute_request(Method::PUT, "/catalog/register", q, None, b)
+            .await?;
+
+        Ok(resp.status() == StatusCode::OK)
+    }
+
+    /// Catalog Deregister Entity
+    /// This endpoint is a low-level mechanism for directly removing entries
+    /// from the Catalog. It is usually preferable to instead use the agent
+    /// endpoints for deregistration as they are simpler and perform
+    /// anti-entropy.
+    pub async fn catalog_deregister_entity(
+        &self,
+        q: &CatalogDeregisterEntityQuery,
+        b: &DeregisterRequest,
+    ) -> Result<bool> {
+        let resp = self
+            .execute_request(Method::PUT, "/catalog/deregister", q, None, b)
+            .await?;
+
+        Ok(resp.status() == StatusCode::OK)
+    }
+
+    /// Catalog List Datacenters
+    /// This endpoint returns the list of all known datacenters. The
+    /// datacenters will be sorted in ascending order based on the estimated
+    /// median round trip time from the server to the servers in that
+    /// datacenter.
+    pub async fn catalog_list_datacenters(&self) -> Result<Vec<String>> {
+        let resp = self
+            .execute_request(Method::GET, "/catalog/datacenters", &(), None, &())
+            .await?;
+
+        resp.json().await.map_err(|e| anyhow!(e))
+    }
+
+    /// Catalog List Nodes
+    /// This endpoint and returns the nodes registered in a given datacenter.
+    pub async fn catalog_list_nodes(&self) -> Result<Vec<Node>> {
+        let resp = self
+            .execute_request(Method::GET, "/catalog/nodes", &(), None, &())
+            .await?;
+
+        resp.json().await.map_err(|e| anyhow!(e))
+    }
+
+    /// Catalog List Services
+    /// This endpoint returns the services registered in a given datacenter.
+    pub async fn catalog_list_services(
+        &self,
+        q: &CatalogListServicesQuery,
+    ) -> Result<::std::collections::HashMap<String, Vec<String>>> {
+        let resp = self
+            .execute_request(Method::GET, "/catalog/services", q, None, &())
+            .await?;
+
+        resp.json().await.map_err(|e| anyhow!(e))
+    }
+
+    /// Catalog List Nodes for Service
+    /// This endpoint returns the nodes providing a service in a given
+    /// datacenter.
+    pub async fn catalog_list_nodes_for_service<S: Into<String>>(
+        &self,
+        service_name: S,
+        q: &CatalogListNodesForServiceQuery,
+    ) -> Result<Vec<ServiceNode>> {
+        let p = format!("/catalog/service/{}", service_name.into());
+
+        let resp = self.execute_request(Method::GET, &p, q, None, &()).await?;
+
+        resp.json().await.map_err(|e| anyhow!(e))
+    }
+
+    /// List Nodes for Mesh-capable Service
+    /// This endpoint returns the nodes providing a mesh-capable service in a
+    /// given datacenter. This will include both proxies and native
+    /// integrations. A service may register both mesh-capable and incapable
+    /// services at the same time, so this endpoint may be used to filter only
+    /// the mesh-capable endpoints.
+    pub async fn catalog_list_nodes_for_mesh_capable_service<S: Into<String>>(
+        &self,
+        service: S,
+        q: &CatalogListNodesForServiceQuery,
+    ) -> Result<Vec<ServiceNode>> {
+        let p = format!("/catalog/connect/{}", service.into());
+
+        let resp = self.execute_request(Method::GET, &p, q, None, &()).await?;
+
+        resp.json().await.map_err(|e| anyhow!(e))
+    }
+
+    /// Retrieve Map of Services for a Node
+    /// This endpoint returns the node's registered services.
+    pub async fn catalog_node_services<S: Into<String>>(
+        &self,
+        node_name: S,
+        q: &CatalogNodeServicesQuery,
+    ) -> Result<Option<NodeServices>> {
+        let p = format!("/catalog/node/{}", node_name.into());
+
+        let resp = self.execute_request(Method::GET, &p, q, None, &()).await?;
+
+        if resp.status() == StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+
+        resp.json().await.map_err(|e| anyhow!(e))
+    }
+
+    /// List Services for Gateway
+    /// This endpoint returns the services associated with an ingress gateway
+    /// or terminating gateway.
+    pub async fn catalog_gateway_services<S: Into<String>>(
+        &self,
+        gateway: S,
+        q: &CatalogGatewayServicesQuery,
+    ) -> Result<Vec<GatewayService>> {
+        let p = format!("/catalog/gateway-services/{}", gateway.into());
+
+        let resp = self.execute_request(Method::GET, &p, q, None, &()).await?;
+
+        resp.json().await.map_err(|e| anyhow!(e))
+    }
+
+    /// Fire Event
+    /// This endpoint triggers a new user event.
+    pub async fn event_fire<S: Into<String>>(
+        &self,
+        name: S,
+        body: Option<Vec<u8>>,
+        q: &EventFireQuery,
+    ) -> Result<bool> {
+        let p = format!("/event/fire/{}", name.into());
+
+        let resp = self.execute_request(Method::PUT, &p, q, body, &()).await?;
+
+        Ok(resp.status() == StatusCode::OK)
+    }
+
+    /// List Events
+    /// This endpoint returns the most recent events (up to 256) known by the
+    /// agent. As a consequence of how the event command works, each agent may
+    /// have a different view of the events. Events are broadcast using the
+    /// gossip protocol, so they have no global ordering nor do they make a
+    /// promise of delivery.
+    pub async fn event_list(&self, q: &EventListQuery) -> Result<Vec<UserEvent>> {
+        let resp = self
+            .execute_request(Method::GET, "/event/list", q, None, &())
+            .await?;
+
+        let mut list: Vec<UserEvent> = resp.json().await.map_err(|e| anyhow!(e))?;
+
+        for item in list.iter_mut() {
+            item.payload = item.payload.clone().map_or(None, |v| {
+                // 'bnVsbA==' is null
+                if v.0 == "bnVsbA==" {
+                    None
+                } else {
+                    Some(v)
+                }
+            })
+        }
+
+        Ok(list)
+    }
+
+    /// List Checks for Node
+    /// This endpoint returns the checks specific to the node provided on the
+    /// path.
+    pub async fn health_list_nodes<S: Into<String>>(
+        &self,
+        node: S,
+        q: &HealthListNodesQuery,
+    ) -> Result<Vec<HealthCheck>> {
+        let p = format!("/health/node/{}", node.into());
+
+        let resp = self.execute_request(Method::GET, &p, q, None, &()).await?;
+
+        resp.json().await.map_err(|e| anyhow!(e))
+    }
+
+    /// List Checks for Service
+    /// This endpoint returns the checks associated with the service provided
+    /// on the path.
+    pub async fn health_list_services<S: Into<String>>(
+        &self,
+        service: S,
+        q: &HealthListServicesQuery,
+    ) -> Result<Vec<HealthCheck>> {
+        let p = format!("/health/checks/{}", service.into());
+
+        let resp = self.execute_request(Method::GET, &p, q, None, &()).await?;
+
+        resp.json().await.map_err(|e| anyhow!(e))
+    }
+
+    /// List Service Instances for Service
+    /// This endpoint returns the service instances providing the service
+    /// indicated on the path. Users can also build in support for dynamic load
+    /// balancing and other features by incorporating the use of health checks.
+    pub async fn health_list_service_instances<S: Into<String>>(
+        &self,
+        service: S,
+        q: &HealthListServiceInstancesQuery,
+    ) -> Result<Vec<CheckServiceNode>> {
+        let p = format!("/health/service/{}", service.into());
+
+        let resp = self.execute_request(Method::GET, &p, q, None, &()).await?;
+
+        resp.json().await.map_err(|e| anyhow!(e))
+    }
+
+    /// List Service Instances for Mesh-enabled Service
+    ///
+    /// This endpoint returns the service instances providing a mesh-capable
+    /// service in a given datacenter. This will include both proxies and
+    /// native integrations. A service may register both mesh-capable and
+    /// incapable services at the same time, so this endpoint may be used to
+    /// filter only the mesh-capable endpoints.
+    ///
+    pub async fn health_list_service_instances_for_mesh_capable<S: Into<String>>(
+        &self,
+        service: S,
+        q: &HealthListServiceInstancesQuery,
+    ) -> Result<Vec<CheckServiceNode>> {
+        let p = format!("/health/connect/{}", service.into());
+
+        let resp = self.execute_request(Method::GET, &p, q, None, &()).await?;
+
+        resp.json().await.map_err(|e| anyhow!(e))
+    }
+
+    /// List Service Instances for Ingress Gateways Associated with a Service
+    ///
+    /// This API is available in Consul versions 1.8.0 and later.
+    ///
+    /// This endpoint returns the service instances providing an ingress
+    /// gateway for a service in a given datacenter.
+    ///
+    pub async fn health_list_service_instances_for_ingress_gateways<S: Into<String>>(
+        &self,
+        service: S,
+        q: &HealthListServiceInstancesQuery,
+    ) -> Result<Vec<CheckServiceNode>> {
+        let p = format!("/health/ingress/{}", service.into());
+
+        let resp = self.execute_request(Method::GET, &p, q, None, &()).await?;
+
+        resp.json().await.map_err(|e| anyhow!(e))
+    }
+
+    /// List Checks in State
+    ///
+    /// This endpoint returns the checks in the state provided on the path.
+    ///
+    pub async fn health_list_state(
+        &self,
+        state: Health,
+        q: &HealthListStateQuery,
+    ) -> Result<Vec<HealthCheck>> {
+        let p = format!("/health/state/{}", state);
+
+        let resp = self.execute_request(Method::GET, &p, q, None, &()).await?;
+
+        resp.json().await.map_err(|e| anyhow!(e))
+    }
+
     /// Read Key
     /// This endpoint returns the specified key. If no key exists at the given
     /// path, a 404 is returned instead of a 200 response.
-    pub async fn kv_read_key(&self, q: &KVReadKeyRequestQuery) -> Result<Option<Vec<u8>>> {
-        let path = format!("/kv/{}", q.key);
+    pub async fn kv_read_key<S: Into<String>>(
+        &self,
+        key: S,
+        q: &KVReadKeyQuery,
+    ) -> Result<Option<Vec<u8>>> {
+        let path = format!("/kv/{}", key.into());
         let resp = self
             .execute_request(Method::GET, &path, q, None, &())
             .await?;
@@ -589,12 +1164,13 @@ impl Client {
     /// Create/Update Key
     /// This endpoint updates the value of the specified key. If no key exists
     /// at the given path, the key will be created.
-    pub async fn kv_create_or_update_key(
+    pub async fn kv_create_or_update_key<S: Into<String>>(
         &self,
-        q: &KVCreateOrUpdateKeyRequestQuery,
+        key: S,
         b: Vec<u8>,
+        q: &KVCreateOrUpdateKeyQuery,
     ) -> Result<bool> {
-        let path = format!("/kv/{}", q.key);
+        let path = format!("/kv/{}", key.into());
         let resp = self
             .execute_request(Method::PUT, &path, q, Some(b), &())
             .await?;
@@ -603,11 +1179,101 @@ impl Client {
 
     /// Delete Key
     /// This endpoint deletes a single key or all keys sharing a prefix.
-    pub async fn kv_delete_key(&self, q: &KVDeleteKeyRequestQuery) -> Result<bool> {
-        let path = format!("/kv/{}", q.key);
+    pub async fn kv_delete_key<S: Into<String>>(
+        &self,
+        key: S,
+        q: &KVDeleteKeyQuery,
+    ) -> Result<bool> {
+        let path = format!("/kv/{}", key.into());
         let resp = self
             .execute_request(Method::DELETE, &path, q, None, &())
             .await?;
+        resp.json().await.map_err(|e| anyhow!(e))
+    }
+
+    /// Create a Namespace
+    ///
+    /// This feature requires Consul Enterprise.
+    ///
+    /// This endpoint creates a new Namespace.
+    ///
+    #[cfg(feature = "enterprise")]
+    pub async fn namespace_create(&self, b: &NamespaceCreateBody) -> Result<NamespaceDetail> {
+        let resp = self
+            .execute_request(Method::PUT, "/namespace", &(), None, b)
+            .await?;
+        resp.json().await.map_err(|e| anyhow!(e))
+    }
+
+    /// Read a Namespace
+    ///
+    /// This feature requires Consul Enterprise.
+    ///
+    /// This endpoint reads a Namespace with the given name.
+    ///
+    #[cfg(feature = "enterprise")]
+    pub async fn namespace_read<S: Into<String>>(
+        &self,
+        name: S,
+        q: &NamespaceReadQuery,
+    ) -> Result<Option<NamespaceDetail>> {
+        let p = format!("/namespace/{}", name.into());
+
+        let resp = self.execute_request(Method::GET, &p, &q, None, &()).await?;
+
+        if resp.status() == StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+
+        Ok(Some(resp.json().await.map_err(|e| anyhow!(e))?))
+    }
+
+    /// Update a Namespace
+    ///
+    /// This feature requires Consul Enterprise.
+    ///
+    /// This endpoint reads a Namespace with the given name.
+    ///
+    #[cfg(feature = "enterprise")]
+    pub async fn namespace_update<S: Into<String>>(
+        &self,
+        name: S,
+        b: &NamespaceUpdateBody,
+    ) -> Result<NamespaceDetail> {
+        let p = format!("/namespace/{}", name.into());
+
+        let resp = self.execute_request(Method::PUT, &p, &(), None, &b).await?;
+
+        resp.json().await.map_err(|e| anyhow!(e))
+    }
+
+    /// Get Raft Leader
+    ///
+    /// This endpoint returns the Raft leader for the datacenter in which the
+    /// agent is running.
+    ///
+    pub async fn status_leader(&self, q: &StatusQuery) -> Result<String> {
+        let resp = self
+            .execute_request(Method::GET, "/status/leader", q, None, &())
+            .await?;
+
+        resp.text_with_charset("utf-8")
+            .await
+            .map_err(|e| anyhow!(e))
+    }
+
+    /// List Raft Peers
+    ///
+    /// This endpoint retrieves the Raft peers for the datacenter in which the
+    /// agent is running. This list of peers is strongly consistent and can be
+    /// useful in determining when a given server has successfully joined the
+    /// cluster.
+    ///
+    pub async fn status_peers(&self, q: &StatusQuery) -> Result<Vec<String>> {
+        let resp = self
+            .execute_request(Method::GET, "/status/peers", q, None, &())
+            .await?;
+
         resp.json().await.map_err(|e| anyhow!(e))
     }
 

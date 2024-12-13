@@ -14,9 +14,9 @@ use std::collections::HashMap;
 pub use reqwest::Proxy;
 
 #[cfg(all(feature = "v1", feature = "v1_20_x"))]
-mod structs_1_20_1;
+mod structs_1_20_x;
 #[cfg(all(feature = "v1", feature = "v1_20_x"))]
-pub use structs_1_20_1::*;
+pub use structs_1_20_x::*;
 
 pub struct Config {
     pub token: String,
@@ -144,9 +144,6 @@ pub struct ServiceConfigurationRequestQuery {
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct LocalServiceHealthByNameRequestQuery {
-    #[serde(skip_serializing)]
-    pub service_name: String,
-
     #[cfg(feature = "enterprise")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ns: Option<String>,
@@ -154,9 +151,6 @@ pub struct LocalServiceHealthByNameRequestQuery {
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct LocalServiceHealthByIDRequestQuery {
-    #[serde(skip_serializing)]
-    pub service_id: String,
-
     #[cfg(feature = "enterprise")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ns: Option<String>,
@@ -178,9 +172,6 @@ pub struct RegisterServiceRequestQuery {
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct DeregisterServiceRequestQuery {
-    #[serde(skip_serializing)]
-    pub service_id: String,
-
     #[cfg(feature = "enterprise")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ns: Option<String>,
@@ -765,11 +756,12 @@ impl Client {
     /// being the default. In order to get the text format, you can
     /// append ?format=text to the URL or use Mime Content negotiation
     /// by specifying a HTTP Header Accept starting with text/plain.
-    pub async fn agent_get_service_health_by_name(
+    pub async fn agent_get_service_health_by_name<S: Into<String>>(
         &self,
+        service_name: S,
         q: &LocalServiceHealthByNameRequestQuery,
     ) -> Result<Vec<AgentServiceChecksInfo>> {
-        let path = format!("/agent/health/service/name/{}", q.service_name);
+        let path = format!("/agent/health/service/name/{}", service_name.into());
         let resp = self
             .execute_request(Method::GET, &path, q, None, &())
             .await?;
@@ -779,11 +771,12 @@ impl Client {
     /// Get local service health by ID
     /// Retrieve the health state of a specific service on the local agent
     /// by ID.
-    pub async fn agent_get_service_health_by_id(
+    pub async fn agent_get_service_health_by_id<S: Into<String>>(
         &self,
+        service_id: S,
         q: &LocalServiceHealthByIDRequestQuery,
     ) -> Result<Option<AgentServiceChecksInfo>> {
-        let path = format!("/agent/health/service/id/{}", q.service_id);
+        let path = format!("/agent/health/service/id/{}", service_id.into());
         let resp = self
             .execute_request(Method::GET, &path, q, None, &())
             .await?;
@@ -806,11 +799,11 @@ impl Client {
         &self,
         q: &RegisterServiceRequestQuery,
         b: &ServiceDefinition,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         let resp = self
             .execute_request(Method::PUT, "/agent/service/register", q, None, b)
             .await?;
-        resp.json().await.map_err(|e| anyhow!(e))
+        Ok(resp.status() == StatusCode::OK)
     }
 
     /// Deregister Service
@@ -819,12 +812,16 @@ impl Client {
     ///
     /// The agent will take care of deregistering the service with the catalog.
     /// If there is an associated check, that is also deregistered.
-    pub async fn agent_deregister_service(&self, q: &DeregisterServiceRequestQuery) -> Result<()> {
-        let path = format!("/agent/service/deregister/{}", q.service_id);
+    pub async fn agent_deregister_service<S: Into<String>>(
+        &self,
+        service_id: S,
+        q: &DeregisterServiceRequestQuery,
+    ) -> Result<bool> {
+        let path = format!("/agent/service/deregister/{}", service_id.into());
         let resp = self
             .execute_request(Method::PUT, &path, q, None, &())
             .await?;
-        resp.json().await.map_err(|e| anyhow!(e))
+        Ok(resp.status() == StatusCode::OK)
     }
 
     /// Enable Maintenance Mode

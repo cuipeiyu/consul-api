@@ -94,7 +94,7 @@ func main() {
 	workspace := filepath.Dir(getGoEnv("GOMOD"))
 
 	consulPath := filepath.Join(workspace, "..", "consul-1.20.1")
-	outputFilename := filepath.Join(workspace, "..", "src", "structs_1_20_1.rs")
+	outputFilename := filepath.Join(workspace, "..", "src", "structs_1_20_x.rs")
 
 	apiPath := filepath.Join(consulPath, "api")
 	agentPath := filepath.Join(consulPath, "agent")

@@ -6,7 +6,7 @@
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum MeshGatewayMode {
     /// MeshGatewayModeDefault represents no specific mode and should
     /// be used to indicate that a different layer of the configuration
@@ -48,7 +48,7 @@ impl ::core::fmt::Display for MeshGatewayMode {
 }
 
 // TODO 不清楚为何会返回 “Default”，但又不在定义中，所以暂时用字符串代替这个定义
-// #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+// #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 // pub enum ProxyMode {
 //     /// ProxyModeDefault represents no specific mode and should
 //     /// be used to indicate that a different layer of the configuration
@@ -83,7 +83,7 @@ impl ::core::fmt::Display for MeshGatewayMode {
 //     }
 // }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum LogSinkType {
     #[serde(rename = "")]
     Default,
@@ -112,7 +112,7 @@ impl ::core::fmt::Display for LogSinkType {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum Health {
     /// HealthAny is special, and is used as a wild card,
     /// not as a specific state.
@@ -146,7 +146,7 @@ impl ::core::fmt::Display for Health {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum GatewayServiceKind {
     #[serde(rename = "")]
     Unknown,

@@ -134,6 +134,18 @@ impl Default for Health {
     }
 }
 
+impl From<&str> for Health {
+    fn from(s: &str) -> Self {
+        match s {
+            _ => Self::Any,
+            "passing" => Self::Passing,
+            "warning" => Self::Warning,
+            "critical" => Self::Critical,
+            "maintenance" => Self::Maintenance,
+        }
+    }
+}
+
 impl ::core::fmt::Display for Health {
     fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
         match self {

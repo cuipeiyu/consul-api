@@ -7,6 +7,7 @@ use reqwest::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::time::Duration;
 
 // #[doc(hidden)]
 // pub use reqwest::header;
@@ -18,6 +19,7 @@ mod structs_1_20_x;
 #[cfg(all(feature = "v1", feature = "v1_20_x"))]
 pub use structs_1_20_x::*;
 
+#[derive(Clone)]
 pub struct Config {
     pub token: String,
     pub address: String,
@@ -41,6 +43,7 @@ impl Default for Config {
 pub struct ClientBuilder {
     cfg: Config,
     proxies: Vec<Proxy>,
+    timeout: Option<Duration>,
 }
 
 impl ClientBuilder {
@@ -48,11 +51,17 @@ impl ClientBuilder {
         Self {
             cfg,
             proxies: vec![],
+            timeout: None,
         }
     }
 
     pub fn with_proxy(mut self, proxy: Proxy) -> Self {
         self.proxies.push(proxy);
+        self
+    }
+
+    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = Some(timeout);
         self
     }
 
@@ -71,6 +80,10 @@ impl ClientBuilder {
         for proxy in self.proxies {
             // add proxy
             builder = builder.proxy(proxy)
+        }
+
+        if let Some(v) = self.timeout {
+            builder = builder.timeout(v);
         }
 
         Ok(Client {
@@ -497,6 +510,9 @@ pub struct HealthListServiceInstancesQuery {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub peer: Option<String>,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub index: Option<u64>,
+
     #[cfg(feature = "enterprise")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ns: Option<String>,
@@ -622,6 +638,7 @@ pub struct StatusQuery {
 }
 
 /// The Consul API client.
+#[derive(Clone)]
 pub struct Client {
     cfg: Config,
     http: reqwest::Client,

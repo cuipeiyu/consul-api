@@ -19,7 +19,7 @@ mod structs_1_20_x;
 #[cfg(all(feature = "v1", feature = "v1_20_x"))]
 pub use structs_1_20_x::*;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Config {
     pub token: String,
     pub address: String,

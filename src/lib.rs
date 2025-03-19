@@ -638,7 +638,7 @@ pub struct StatusQuery {
 }
 
 /// The Consul API client.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Client {
     cfg: Config,
     http: reqwest::Client,

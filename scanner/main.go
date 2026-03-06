@@ -93,8 +93,8 @@ func (s *rustStruct) String() string {
 func main() {
 	workspace := filepath.Dir(getGoEnv("GOMOD"))
 
-	consulPath := filepath.Join(workspace, "..", "consul-1.20.1")
-	outputFilename := filepath.Join(workspace, "..", "src", "structs_1_20_x.rs")
+	consulPath := filepath.Join(workspace, "..", "consul-1.22.5")
+	outputFilename := filepath.Join(workspace, "..", "src", "structs_1_22_x.rs")
 
 	apiPath := filepath.Join(consulPath, "api")
 	agentPath := filepath.Join(consulPath, "agent")

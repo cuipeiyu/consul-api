@@ -83,8 +83,9 @@ impl ::core::fmt::Display for MeshGatewayMode {
 //     }
 // }
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum LogSinkType {
+    #[default]
     #[serde(rename = "")]
     Default,
     #[serde(rename = "file")]
@@ -93,12 +94,6 @@ pub enum LogSinkType {
     StdErr,
     #[serde(rename = "stdout")]
     StdOut,
-}
-
-impl Default for LogSinkType {
-    fn default() -> Self {
-        Self::Default
-    }
 }
 
 impl ::core::fmt::Display for LogSinkType {
@@ -112,10 +107,11 @@ impl ::core::fmt::Display for LogSinkType {
     }
 }
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum Health {
     /// HealthAny is special, and is used as a wild card,
     /// not as a specific state.
+    #[default]
     #[serde(rename = "any")]
     Any,
     #[serde(rename = "passing")]
@@ -128,20 +124,14 @@ pub enum Health {
     Maintenance,
 }
 
-impl Default for Health {
-    fn default() -> Self {
-        Self::Any
-    }
-}
-
 impl From<&str> for Health {
     fn from(s: &str) -> Self {
         match s {
-            _ => Self::Any,
             "passing" => Self::Passing,
             "warning" => Self::Warning,
             "critical" => Self::Critical,
             "maintenance" => Self::Maintenance,
+            _ => Self::Any,
         }
     }
 }

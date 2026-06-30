@@ -709,12 +709,12 @@ impl Client {
     /// TTL Check Warn
     /// This endpoint is used with a TTL type check to set the status of the check
     /// to warning and to reset the TTL clock.
-    pub async fn agent_check_warn(&self, q: &AgentTTLCheckRequestQuery) -> Result<()> {
+    pub async fn agent_check_warn(&self, q: &AgentTTLCheckRequestQuery) -> Result<bool> {
         let path = format!("/agent/check/warn/{}", q.check_id);
         let resp = self
             .execute_request(Method::PUT, &path, q, None, &())
             .await?;
-        resp.json().await.map_err(|e| anyhow!(e))
+        Ok(resp.status() == StatusCode::OK)
     }
 
     /// TTL Check Fail
@@ -825,7 +825,14 @@ impl Client {
         let resp = self
             .execute_request(Method::PUT, "/agent/service/register", q, None, b)
             .await?;
-        Ok(resp.status() == StatusCode::OK)
+        
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let error_text = resp.text().await?;
+            return Err(anyhow!("agent_register_service failed with status {}: {}", status, error_text));
+        }
+        
+        Ok(true)
     }
 
     /// Deregister Service
@@ -1041,7 +1048,8 @@ impl Client {
 
         for item in list.iter_mut() {
             item.payload = item.payload.clone().map_or(None, |v| {
-                // 'bnVsbA==' is null
+                // Consul may return "null" (base64: "bnVsbA==") for empty payloads
+                // Filter out these null payloads
                 if v.0 == "bnVsbA==" {
                     None
                 } else {
@@ -1193,6 +1201,12 @@ impl Client {
         let resp = self
             .execute_request(Method::PUT, &path, q, Some(b), &())
             .await?;
+        
+        if !resp.status().is_success() {
+            let error_text = resp.text().await?;
+            return Err(anyhow!("KV create/update failed: {}", error_text));
+        }
+        
         resp.json().await.map_err(|e| anyhow!(e))
     }
 
@@ -1207,6 +1221,12 @@ impl Client {
         let resp = self
             .execute_request(Method::DELETE, &path, q, None, &())
             .await?;
+        
+        if !resp.status().is_success() {
+            let error_text = resp.text().await?;
+            return Err(anyhow!("KV delete failed: {}", error_text));
+        }
+        
         resp.json().await.map_err(|e| anyhow!(e))
     }
 
@@ -1308,7 +1328,8 @@ impl Client {
         Q: Serialize,
         B: Serialize,
     {
-        let path = format!("{}{}{}", self.cfg.address, self.prefix, path);
+        let address = self.cfg.address.trim_end_matches('/');
+        let path = format!("{}{}{}", address, self.prefix, path);
         let mut b = self.http.request(method.clone(), &path);
 
         b = b.query(query);

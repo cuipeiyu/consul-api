@@ -13,7 +13,7 @@ import (
 	"strings"
 )
 
-//go:embed head.rs
+//go:embed head.rs.tpl
 var headFile string
 
 var allStructs = make([]*rustStruct, 0)
@@ -245,8 +245,7 @@ func parseGoFile(path string, picks []string) {
 				extra:    structExtra(structName),
 			}
 
-		a:
-			// 遍历结构体的字段
+		// 遍历结构体的字段
 			for _, field := range structType.Fields.List {
 				fieldName := ""
 				fieldType := ""
@@ -262,7 +261,7 @@ func parseGoFile(path string, picks []string) {
 					fieldTag = field.Tag.Value
 
 					if strings.Contains(fieldTag, "json:\"-\"") {
-						continue a
+						continue
 					}
 
 					if strings.Contains(fieldTag, "omitempty") {
@@ -304,18 +303,18 @@ func parseGoFile(path string, picks []string) {
 				if field.Names != nil {
 					fieldName = strings.TrimSpace(field.Names[0].Name)
 					if fieldSkip(structName, fieldName) {
-						continue a
+						continue
 					}
 				} else {
 					if fieldSkip(structName, fieldType) {
-						continue a
+						continue
 					}
 					// 匿名字段
 					structTemp.fields = append(structTemp.fields, &rustStructField{
 						anonymous: true,
 						name:      fieldType,
 					})
-					continue a
+					continue
 				}
 
 				fieldTmp := rustStructField{}
@@ -609,18 +608,19 @@ func walkDir(path string, picks []string) {
 	}
 }
 
-var goEnvCache = ""
+var goEnvCache = make(map[string]string)
 
 func getGoEnv(key string) string {
-	if goEnvCache != "" {
-		return goEnvCache
+	if val, ok := goEnvCache[key]; ok {
+		return val
 	}
 	out, err := exec.Command("go", "env", key).Output()
 	if err != nil {
 		panic(err.Error())
 	}
-	goEnvCache = string(out)
-	return string(out)
+	val := strings.TrimSpace(string(out))
+	goEnvCache[key] = val
+	return val
 }
 
 var matchNonAlphaNumeric = regexp.MustCompile(`[^a-zA-Z0-9]+`)

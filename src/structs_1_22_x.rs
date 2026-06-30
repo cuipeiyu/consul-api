@@ -83,8 +83,9 @@ impl ::core::fmt::Display for MeshGatewayMode {
 //     }
 // }
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum LogSinkType {
+    #[default]
     #[serde(rename = "")]
     Default,
     #[serde(rename = "file")]
@@ -93,12 +94,6 @@ pub enum LogSinkType {
     StdErr,
     #[serde(rename = "stdout")]
     StdOut,
-}
-
-impl Default for LogSinkType {
-    fn default() -> Self {
-        Self::Default
-    }
 }
 
 impl ::core::fmt::Display for LogSinkType {
@@ -112,10 +107,11 @@ impl ::core::fmt::Display for LogSinkType {
     }
 }
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum Health {
     /// HealthAny is special, and is used as a wild card,
     /// not as a specific state.
+    #[default]
     #[serde(rename = "any")]
     Any,
     #[serde(rename = "passing")]
@@ -128,20 +124,14 @@ pub enum Health {
     Maintenance,
 }
 
-impl Default for Health {
-    fn default() -> Self {
-        Self::Any
-    }
-}
-
 impl From<&str> for Health {
     fn from(s: &str) -> Self {
         match s {
-            _ => Self::Any,
             "passing" => Self::Passing,
             "warning" => Self::Warning,
             "critical" => Self::Critical,
             "maintenance" => Self::Maintenance,
+            _ => Self::Any,
         }
     }
 }
@@ -1468,16 +1458,16 @@ pub struct ServiceDefinition {
     #[serde(rename = "Port")]
     pub port: u16,
 
-    #[serde(rename = "Ports")]
+    #[serde(rename = "Ports", skip_serializing)]
     pub ports: u16,
 
     #[serde(rename = "SocketPath")]
     pub socket_path: String,
 
-    #[serde(rename = "Check")]
+    #[serde(rename = "Check", skip_serializing)]
     pub check: CheckType,
 
-    #[serde(rename = "Checks")]
+    #[serde(rename = "Checks", skip_serializing)]
     pub checks: CheckTypes,
 
     #[serde(rename = "Weights")]
@@ -1692,7 +1682,8 @@ pub struct ServiceNode {
     pub service_port: u16,
 
     #[serde(rename = "ServicePorts")]
-    pub service_ports: u16,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_ports: Option<::std::collections::HashMap<String, u16>>,
 
     #[serde(rename = "ServiceSocketPath")]
     pub service_socket_path: String,
